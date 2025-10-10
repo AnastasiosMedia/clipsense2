@@ -1,0 +1,99 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  e2e-tests:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ["3.11"]
+        node-version: ["20"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Install FFmpeg (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Install FFmpeg (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install ffmpeg
+
+      - name: Verify FFmpeg installation
+        run: |
+          ffmpeg -version
+          ffprobe -version
+
+      - name: Cache Python dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('worker/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Cache pnpm dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.pnpm-store
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('package.json', 'app/package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+
+      - name: Install Python dependencies
+        run: |
+          cd worker
+          pip install -r requirements.txt
+
+      - name: Install Node.js dependencies
+        run: |
+          pnpm install
+
+      - name: Generate test assets
+        run: |
+          pnpm run test:e2e:assets
+
+      - name: Verify test assets
+        run: |
+          ls -la tests/media/
+          file tests/media/*
+
+      - name: Run E2E tests
+        run: |
+          pnpm run test:e2e:ci
+        env:
+          WORKER_PORT: 8123
+          E2E_TARGET_SECONDS: 20
+
+      - name: Upload artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-failure-artifacts-${{ matrix.os }}
+          path: |
+            tests/.tmp/**/highlight*.mp4
+            tests/.tmp/**/logs/**
+            .pytest_cache/**/*
+          if-no-files-found: ignore
+          retention-days: 7

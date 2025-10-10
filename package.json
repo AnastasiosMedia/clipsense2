@@ -1,0 +1,30 @@
+{
+  "name": "clipsense",
+  "version": "1.0.0",
+  "description": "ClipSense - Local Video Highlight Generator",
+  "private": true,
+  "workspaces": [
+    "app"
+  ],
+  "scripts": {
+    "test:e2e:assets": "python tests/e2e_assets.py || bash tests/e2e_assets.sh",
+    "test:verify:assets": "python tests/verify_assets.py",
+    "test:generate:hashes": "python tests/verify_assets.py generate",
+    "test:short": "pytest -m short",
+    "test:long": "pytest -m long",
+    "test:parallel": "pytest -n auto",
+    "test:parallel:short": "pytest -m short -n auto",
+    "test:parallel:long": "pytest -m long -n auto",
+    "test:e2e": "pnpm run test:e2e:assets && pytest -m short",
+    "test:e2e:all": "pnpm run test:e2e:assets && pytest -m 'short or long'",
+    "test:e2e:ci": "pnpm run test:e2e:assets && pytest -m short --tb=short",
+    "test:runner": "python run_tests.py",
+    "test:runner:ci": "python run_tests.py --ci --cleanup",
+    "setup": "cd worker && pip install -r requirements.txt && cd ../app && pnpm install",
+    "dev": "concurrently \"cd worker && python run_dev.py\" \"cd app && pnpm tauri dev\"",
+    "build": "cd app && pnpm tauri build"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
