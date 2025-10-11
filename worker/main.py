@@ -20,6 +20,8 @@ from video_processor import VideoProcessor
 from conform import ConformProcessor
 from config import Config
 from ffmpeg_checker import FFmpegChecker
+from simple_beat_detector import SimpleBeatDetector
+from fcp7_xml_generator import generate_fcp7_xml
 
 # Global state
 ffmpeg_available = False
@@ -121,6 +123,38 @@ class ConformResponse(BaseModel):
     master_output: Optional[str] = None
     error: Optional[str] = None
     conform_time: Optional[float] = None
+
+
+class AnalyzeMusicRequest(BaseModel):
+    """Request model for music analysis"""
+    music_path: str
+    target_duration: Optional[float] = None
+
+
+class AnalyzeMusicResponse(BaseModel):
+    """Response model for music analysis"""
+    ok: bool
+    tempo: Optional[float] = None
+    beat_times: Optional[List[float]] = None
+    bar_times: Optional[List[float]] = None
+    bars_per_minute: Optional[float] = None
+    beats_per_bar: Optional[int] = None
+    time_signature: Optional[str] = None
+    analysis_duration: Optional[float] = None
+    error: Optional[str] = None
+
+
+class FCP7XMLRequest(BaseModel):
+    """Request model for FCP7 XML generation"""
+    timeline_path: str
+    output_path: Optional[str] = None
+
+
+class FCP7XMLResponse(BaseModel):
+    """Response model for FCP7 XML generation"""
+    ok: bool
+    xml_path: Optional[str] = None
+    error: Optional[str] = None
 
 @app.get("/")
 async def root():
@@ -230,6 +264,90 @@ async def conform_timeline(request: ConformRequest):
     except Exception as e:
         error_msg = f"Conform error: {str(e)}"
         return ConformResponse(ok=False, error=error_msg)
+
+
+@app.post("/analyze_music", response_model=AnalyzeMusicResponse)
+async def analyze_music(request: AnalyzeMusicRequest):
+    """
+    Analyze music file to detect tempo, beats, and bars
+    
+    Args:
+        request: AnalyzeMusicRequest containing music path and optional target duration
+        
+    Returns:
+        AnalyzeMusicResponse with tempo, beat times, bar times, and metadata
+    """
+    if not ffmpeg_available:
+        return AnalyzeMusicResponse(ok=False, error="FFmpeg not available")
+    
+    try:
+        # Validate music file exists
+        if not os.path.exists(request.music_path):
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Music file not found: {request.music_path}"
+            )
+        
+        # Analyze the music
+        detector = SimpleBeatDetector()
+        analysis = await detector.analyze_music(request.music_path, request.target_duration)
+        
+        return AnalyzeMusicResponse(
+            ok=True,
+            tempo=analysis["tempo"],
+            beat_times=analysis["beat_times"],
+            bar_times=analysis["bar_times"],
+            bars_per_minute=analysis["bars_per_minute"],
+            beats_per_bar=analysis["beats_per_bar"],
+            time_signature=analysis["time_signature"],
+            analysis_duration=analysis["analysis_duration"]
+        )
+        
+    except Exception as e:
+        error_msg = f"Music analysis error: {str(e)}"
+        print(f"❌ Music analysis exception: {type(e).__name__}: {e}")
+        return AnalyzeMusicResponse(ok=False, error=error_msg)
+
+
+@app.post("/generate_fcp7_xml", response_model=FCP7XMLResponse)
+async def generate_fcp7_xml_endpoint(request: FCP7XMLRequest):
+    """
+    Generate FCP7 XML file for Premiere Pro import
+    
+    Args:
+        request: FCP7XMLRequest containing timeline path and optional output path
+        
+    Returns:
+        FCP7XMLResponse with XML file path
+    """
+    try:
+        # Validate timeline file exists
+        if not os.path.exists(request.timeline_path):
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Timeline file not found: {request.timeline_path}"
+            )
+        
+        # Determine output path
+        if request.output_path:
+            output_path = request.output_path
+        else:
+            # Generate default output path
+            timeline_dir = os.path.dirname(request.timeline_path)
+            output_path = os.path.join(timeline_dir, "highlight_timeline.xml")
+        
+        # Generate FCP7 XML
+        xml_path = generate_fcp7_xml(request.timeline_path, output_path)
+        
+        return FCP7XMLResponse(
+            ok=True,
+            xml_path=xml_path
+        )
+        
+    except Exception as e:
+        error_msg = f"FCP7 XML generation error: {str(e)}"
+        print(f"❌ FCP7 XML generation exception: {type(e).__name__}: {e}")
+        return FCP7XMLResponse(ok=False, error=error_msg)
 
 
 @app.get("/health")

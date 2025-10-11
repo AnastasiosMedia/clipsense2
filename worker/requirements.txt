@@ -10,3 +10,4 @@ pytest-asyncio==0.21.1
 pytest-xdist==3.3.1
 requests==2.31.0
 librosa==0.10.1
+soundfile==0.12.1

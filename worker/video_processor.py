@@ -18,7 +18,7 @@ from typing import List, Tuple, Dict, Any
 import asyncio
 from config import Config
 from timeline import write_timeline
-from beat_detection import BeatDetector
+from simple_beat_detector import SimpleBeatDetector
 
 class VideoProcessor:
     """Handles all video processing operations using FFmpeg"""
@@ -26,7 +26,7 @@ class VideoProcessor:
     def __init__(self):
         self.temp_dir = None
         self.proxy_dir = None
-        self.beat_detector = BeatDetector()
+        self.beat_detector = SimpleBeatDetector()
     
     async def process_highlight(
         self, 
@@ -92,25 +92,33 @@ class VideoProcessor:
                 print(f"⏱️  Proxy creation took {proxy_time:.2f} seconds")
                 print(f"🕐 [TIMING] Proxy creation completed at {time.strftime('%H:%M:%S')}")
             
-            # Step 2: Detect beats in music for precise timing
-            print("🥁 Analyzing music for beat detection...")
-            beat_times = await self.beat_detector.detect_downbeats(music_path, target_duration)
+            # Step 2: Analyze music for tempo, beats, and bars
+            print("🎵 Analyzing music for tempo and bar detection...")
+            music_analysis = await self.beat_detector.analyze_music(music_path, target_duration)
             
-            if len(beat_times) < len(proxy_paths):
-                print(f"⚠️  Only {len(beat_times)} beats found for {len(proxy_paths)} clips")
+            tempo = music_analysis["tempo"]
+            beat_times = music_analysis["beat_times"]
+            bar_times = music_analysis["bar_times"]
+            
+            print(f"🎼 Music analysis complete:")
+            print(f"   Tempo: {tempo:.1f} BPM")
+            print(f"   Beats: {len(beat_times)}")
+            print(f"   Bars: {len(bar_times)}")
+            print(f"   First bar: {bar_times[0]:.3f}s")
+            print(f"   Time signature: {music_analysis.get('time_signature', '4/4')}")
+            
+            # Use bar times for clip alignment if we have enough bars
+            if len(bar_times) >= len(proxy_paths):
+                print(f"🎯 Using {len(bar_times)} detected bars for clip alignment")
+                trimmed_segments = await self._trim_segments_with_bars(proxy_paths, bar_times, target_duration)
+            elif len(beat_times) >= len(proxy_paths):
+                print(f"🎯 Using {len(beat_times)} detected beats for timing")
+                trimmed_segments = await self._trim_segments_with_beats(proxy_paths, beat_times, target_duration)
+            else:
+                print(f"⚠️  Not enough beats/bars found for {len(proxy_paths)} clips")
                 print("🔄 Using regular timing as fallback")
                 segment_duration = target_duration / len(proxy_paths)
-            else:
-                # Use beat times to determine segment durations
-                print(f"🎯 Using {len(beat_times)} detected beats for timing")
-                # For now, use equal segments between beats
-                segment_duration = target_duration / len(proxy_paths)
-            
-            print(f"📏 Each clip will contribute {segment_duration:.2f} seconds (beat detection mode)")
-            
-            # Step 3: Trim equal segments from each clip
-            print("✂️  Trimming segments from clips...")
-            trimmed_segments = await self._trim_segments(proxy_paths, segment_duration)
+                trimmed_segments = await self._trim_segments(proxy_paths, segment_duration)
             
             # Step 4: Check if we need to loop segments to reach target duration
             actual_duration = 0.0
@@ -142,16 +150,22 @@ class VideoProcessor:
             
             print(f"✅ Proxy video created: {final_output}")
             
-            # Generate timeline data with beat information
-            timeline_data = await self._generate_timeline_data(clips, trimmed_segments, target_duration, music_path, beat_times)
+            # Generate timeline data with music analysis
+            timeline_data = await self._generate_timeline_data(clips, trimmed_segments, target_duration, music_path, beat_times, bar_times)
             timeline_path = os.path.join(self.temp_dir, "timeline.json")
+            
+            print(f"📝 Writing timeline with bar markers starting at {bar_times[0]:.3f}s")
+            
             write_timeline(
                 clips=timeline_data,
                 target_seconds=target_duration,
                 music_path=music_path,
                 output_path=timeline_path,
-                used_scene_detect=False,  # We're using beat detection instead
-                used_beat_snapping=True   # We're using 3-second beat intervals
+                used_scene_detect=False,  # We're using music analysis instead
+                used_beat_snapping=True,  # We're using music-based timing
+                bar_markers=bar_times,
+                tempo=tempo,
+                time_signature=music_analysis.get('time_signature', '4/4')
             )
             
             # Rename proxy output
@@ -225,10 +239,132 @@ class VideoProcessor:
                 "-c:a", "aac",
                 "-preset", "fast",
                 "-crf", "23",
+                "-r", "25",  # Force 25fps for consistency
+                "-vf", "scale=1280:720",  # Ensure consistent resolution
                 trimmed_path
             ]
             
             print(f"Trimming segment {i+1}/{len(proxy_paths)}")
+            await self._run_ffmpeg(cmd)
+            trimmed_segments.append(trimmed_path)
+        
+        return trimmed_segments
+    
+    async def _trim_segments_with_beats(self, proxy_paths: List[str], beat_times: List[float], target_duration: float) -> List[str]:
+        """Trim segments using beat detection for precise timing"""
+        trimmed_segments = []
+        
+        # Calculate segment durations based on beat intervals
+        beat_intervals = []
+        for i in range(len(beat_times) - 1):
+            beat_intervals.append(beat_times[i + 1] - beat_times[i])
+        
+        # If we have more clips than beats, extend the last interval
+        if len(proxy_paths) > len(beat_intervals):
+            last_interval = beat_intervals[-1] if beat_intervals else 2.0
+            while len(beat_intervals) < len(proxy_paths):
+                beat_intervals.append(last_interval)
+        
+        print(f"🎵 Beat intervals: {[f'{bi:.2f}s' for bi in beat_intervals[:len(proxy_paths)]]}")
+        
+        for i, proxy_path in enumerate(proxy_paths):
+            # Get video duration first
+            duration = await self._get_video_duration(proxy_path)
+            
+            # Use beat-based segment duration
+            segment_duration = beat_intervals[i] if i < len(beat_intervals) else beat_intervals[-1]
+            
+            # Calculate start time based on beat timing
+            # Try to find interesting content around the beat time
+            beat_time = beat_times[i] if i < len(beat_times) else beat_times[-1]
+            
+            # Look for the best moment around this beat time
+            # Use the beat time as a guide, but ensure we don't go out of bounds
+            start_time = max(0, min(beat_time, duration - segment_duration))
+            
+            # If the beat time is too close to the end, use the middle
+            if start_time + segment_duration > duration:
+                start_time = max(0, (duration - segment_duration) / 2)
+            
+            trimmed_path = os.path.join(self.temp_dir, f"trimmed_beat_{i:03d}.mp4")
+            
+            cmd = [
+                "ffmpeg", "-y",
+                "-i", proxy_path,
+                "-ss", str(start_time),
+                "-t", str(segment_duration),
+                "-c:v", "libx264",
+                "-c:a", "aac",
+                "-preset", "fast",
+                "-crf", "23",
+                "-r", "25",  # Force 25fps for consistency
+                "-vf", "scale=1280:720",  # Ensure consistent resolution
+                trimmed_path
+            ]
+            
+            print(f"🎵 Trimming segment {i+1}/{len(proxy_paths)} (beat at {beat_time:.2f}s, duration {segment_duration:.2f}s)")
+            await self._run_ffmpeg(cmd)
+            trimmed_segments.append(trimmed_path)
+        
+        return trimmed_segments
+    
+    async def _trim_segments_with_bars(self, proxy_paths: List[str], bar_times: List[float], target_duration: float) -> List[str]:
+        """Trim segments using bar detection for precise clip alignment"""
+        trimmed_segments = []
+        
+        # Calculate segment durations based on bar intervals
+        bar_intervals = []
+        for i in range(len(bar_times) - 1):
+            bar_intervals.append(bar_times[i + 1] - bar_times[i])
+        
+        # If we have more clips than bars, extend the last interval
+        if len(proxy_paths) > len(bar_intervals):
+            last_interval = bar_intervals[-1] if bar_intervals else 2.0
+            while len(bar_intervals) < len(proxy_paths):
+                bar_intervals.append(last_interval)
+        
+        print(f"🎼 Bar intervals: {[f'{bi:.2f}s' for bi in bar_intervals[:len(proxy_paths)]]}")
+        
+        for i, proxy_path in enumerate(proxy_paths):
+            # Get video duration first
+            duration = await self._get_video_duration(proxy_path)
+            
+            # Use bar-based segment duration
+            segment_duration = bar_intervals[i] if i < len(bar_intervals) else bar_intervals[-1]
+            
+            # Calculate start time based on bar timing
+            # The bar times are absolute music times, but we need relative video times
+            # Use the bar time as a guide for interesting content, but map it to video time
+            bar_time = bar_times[i] if i < len(bar_times) else bar_times[-1]
+            
+            # Map bar time to video time (use modulo to cycle through video)
+            # This ensures we get interesting content at the right musical moment
+            video_time = bar_time % duration
+            
+            # Look for the best moment around this video time
+            start_time = max(0, min(video_time, duration - segment_duration))
+            
+            # If the mapped time is too close to the end, use the middle
+            if start_time + segment_duration > duration:
+                start_time = max(0, (duration - segment_duration) / 2)
+            
+            trimmed_path = os.path.join(self.temp_dir, f"trimmed_bar_{i:03d}.mp4")
+            
+            cmd = [
+                "ffmpeg", "-y",
+                "-i", proxy_path,
+                "-ss", str(start_time),
+                "-t", str(segment_duration),
+                "-c:v", "libx264",
+                "-c:a", "aac",
+                "-preset", "fast",
+                "-crf", "23",
+                "-r", "25",  # Force 25fps for consistency
+                "-vf", "scale=1280:720",  # Ensure consistent resolution
+                trimmed_path
+            ]
+            
+            print(f"🎼 Trimming segment {i+1}/{len(proxy_paths)} (bar at {bar_time:.2f}s, duration {segment_duration:.2f}s)")
             await self._run_ffmpeg(cmd)
             trimmed_segments.append(trimmed_path)
         
@@ -354,10 +490,12 @@ class VideoProcessor:
         
         return subprocess.CompletedProcess(cmd, process.returncode, stdout, stderr)
     
-    async def _generate_timeline_data(self, original_clips: List[str], trimmed_segments: List[str], target_duration: int, music_path: str, beat_times: List[float] = None) -> List[Dict[str, Any]]:
-        """Generate timeline data from trimmed segments with beat detection"""
+    async def _generate_timeline_data(self, original_clips: List[str], trimmed_segments: List[str], target_duration: int, music_path: str, beat_times: List[float] = None, bar_times: List[float] = None) -> List[Dict[str, Any]]:
+        """Generate timeline data from trimmed segments with beat/bar detection"""
         timeline_clips = []
-        current_time = 0.0
+        
+        # Use bar times if available, otherwise fall back to beat times
+        timing_markers = bar_times if bar_times else beat_times
         
         for i, (original_clip, trimmed_segment) in enumerate(zip(original_clips, trimmed_segments)):
             # Get duration of trimmed segment
@@ -366,11 +504,11 @@ class VideoProcessor:
             # Calculate in/out points for original clip
             original_duration = await self._get_video_duration(original_clip)
             
-            if beat_times and i < len(beat_times):
-                # Use beat detection: find the best moment around the beat time
-                beat_time = beat_times[i]
-                # Look for interesting content around this beat time
-                start_time = max(0, min(beat_time, original_duration - duration))
+            if timing_markers and i < len(timing_markers):
+                # Use timing markers: find the best moment around the marker time
+                marker_time = timing_markers[i]
+                # Look for interesting content around this marker time
+                start_time = max(0, min(marker_time, original_duration - duration))
             else:
                 # Fallback: use middle portion
                 start_time = max(0, (original_duration - duration) / 2)
@@ -380,8 +518,6 @@ class VideoProcessor:
                 "in": round(start_time, 3),
                 "out": round(start_time + duration, 3)
             })
-            
-            current_time += duration
         
         return timeline_clips
     

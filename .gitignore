@@ -38,3 +38,9 @@ tmp/
 
 # FFmpeg temporary files
 clipsense_*
+
+# Test directories with large media files
+tests/testwedding/
+tests/*/video/
+tests/*/music/
+tests/*/highlight*/

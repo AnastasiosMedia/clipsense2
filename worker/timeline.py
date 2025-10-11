@@ -20,7 +20,10 @@ def write_timeline(
     output_path: str,
     fps: int = 25,
     used_scene_detect: bool = False,
-    used_beat_snapping: bool = False
+    used_beat_snapping: bool = False,
+    bar_markers: Optional[List[float]] = None,
+    tempo: Optional[float] = None,
+    time_signature: Optional[str] = None
 ) -> str:
     """
     Write a deterministic timeline.json file with clip timecodes and metadata.
@@ -57,6 +60,14 @@ def write_timeline(
         "created_at": datetime.now().isoformat(),
         "version": "1.0"
     }
+    
+    # Add music analysis data if provided
+    if bar_markers is not None:
+        timeline["bar_markers"] = bar_markers
+    if tempo is not None:
+        timeline["tempo"] = tempo
+    if time_signature is not None:
+        timeline["time_signature"] = time_signature
     
     # Calculate file hashes for source files
     timeline["source_hashes"] = {}
