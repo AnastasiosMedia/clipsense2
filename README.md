@@ -5,16 +5,20 @@ A privacy-first desktop MVP app that automatically creates highlight videos from
 ## Features
 
 - 🎬 Drag-drop multiple video clips
-- 🎵 Select one music track
-- ⚡ Auto-generate 60-second highlight video
+- 🎵 Select one music track with **intelligent beat detection**
+- ⚡ Auto-generate highlight videos with **perfect musical timing**
+- 🎼 **Music start detection** - no more awkward silence
+- 🎯 **Bar-synced cuts** - clips start exactly on musical beats
+- 🎞️ **Premiere Pro integration** - FCP7 XML export
 - 🔒 100% local processing - no cloud, no login
 - 🎨 Modern dark UI with Tailwind CSS
 
 ## Architecture
 
 - **Frontend**: Tauri + React + TypeScript + Tailwind CSS
-- **Backend**: Python FastAPI worker
+- **Backend**: Python FastAPI worker with advanced music analysis
 - **Media Engine**: FFmpeg + ffprobe CLI calls
+- **Beat Detection**: librosa-based tempo and bar detection
 - **Communication**: localhost:8123 API calls
 
 ## Quick Start
@@ -24,6 +28,7 @@ A privacy-first desktop MVP app that automatically creates highlight videos from
 - Node.js 18+ and pnpm
 - Python 3.8+
 - FFmpeg and ffprobe installed on your system
+- **librosa** and **soundfile** for advanced music analysis
 
 ### FFmpeg Installation
 
@@ -121,12 +126,52 @@ clipsense2/
 │   ├── src-tauri/         # Tauri configuration
 │   └── package.json
 ├── worker/                 # Python FastAPI backend
-│   ├── main.py           # FastAPI app
-│   ├── video_processor.py # FFmpeg processing logic
-│   └── requirements.txt   # Python dependencies
+│   ├── main.py           # FastAPI app and endpoints
+│   ├── simple_beat_detector.py # Music analysis engine
+│   ├── video_processor.py # Video processing pipeline
+│   ├── fcp7_xml_generator.py # Premiere Pro export
+│   ├── timeline.py       # Timeline artifact management
+│   ├── config.py         # Configuration settings
+│   └── requirements.txt  # Python dependencies
+├── tests/                 # Test suite
+│   ├── test_autocut_e2e.py # E2E tests
+│   ├── e2e_assets.py     # Synthetic media generation
+│   ├── conftest.py       # Test configuration
+│   └── README.md         # Test documentation
 ├── shared/                # Shared types/schemas
-└── README.md
+├── README.md             # This file
+├── TECHNICAL_DOCS.md     # Comprehensive technical documentation
+├── DEBUG_GUIDE.md        # Debugging and troubleshooting guide
+└── CHANGELOG.md          # Version history and changes
 ```
+
+## 🎵 Advanced Music Features
+
+### Intelligent Beat Detection
+
+ClipSense automatically analyzes your music to create perfectly timed highlights:
+
+- **🎼 Tempo Detection**: Uses librosa to detect BPM with high accuracy
+- **🎯 Bar Detection**: Identifies 4/4 time signature and musical bars
+- **🎵 Music Start Detection**: Finds when music actually begins (not silence)
+- **⚡ Perfect Sync**: Video clips start exactly on musical beats
+
+### Music Analysis Process
+
+1. **Audio Analysis**: Converts music to WAV format for optimal processing
+2. **Tempo Estimation**: Uses multiple algorithms to detect BPM (60-200 range)
+3. **Beat Tracking**: Identifies individual beats with confidence scoring
+4. **Bar Detection**: Groups beats into 4/4 bars for natural cut points
+5. **Start Detection**: Finds actual musical content start (not intro silence)
+6. **Grid Alignment**: Aligns all timing to a consistent musical grid
+
+### Premiere Pro Integration
+
+Generate professional editing files:
+
+- **FCP7 XML Export**: Import directly into Premiere Pro
+- **Timeline Artifacts**: Complete timing data with bar markers
+- **Reproducible Edits**: SHA256 hashes for consistent results
 
 ## How It Works
 
@@ -270,6 +315,48 @@ Response:
 }
 ```
 
+**POST `/analyze_music`** - Analyze music for tempo and beats
+
+```json
+{
+  "music_path": "/path/music.wav",
+  "target_duration": 60
+}
+```
+
+Response:
+
+```json
+{
+  "ok": true,
+  "tempo": 103.4,
+  "beat_times": [0.0, 0.58, 1.16, ...],
+  "bar_times": [0.0, 2.32, 4.64, ...],
+  "bars_per_minute": 25.8,
+  "beats_per_bar": 4,
+  "time_signature": "4/4",
+  "analysis_duration": 1.5
+}
+```
+
+**POST `/generate_fcp7_xml`** - Generate Premiere Pro FCP7 XML
+
+```json
+{
+  "timeline_path": "/path/timeline.json",
+  "output_path": "/path/highlight_timeline.xml"
+}
+```
+
+Response:
+
+```json
+{
+  "ok": true,
+  "xml_path": "/path/highlight_timeline.xml"
+}
+```
+
 ### Command Line Interface
 
 Process timeline files offline:
@@ -394,3 +481,47 @@ curl http://127.0.0.1:8123/health
 
 - Frontend: Browser console (F12)
 - Backend: Terminal output where worker is running
+
+## 📚 Documentation Quick Reference
+
+### Core Documentation
+
+- **[README.md](README.md)** - This file, getting started and basic usage
+- **[TECHNICAL_DOCS.md](TECHNICAL_DOCS.md)** - Comprehensive technical architecture
+- **[DEBUG_GUIDE.md](DEBUG_GUIDE.md)** - Debugging and troubleshooting
+- **[CHANGELOG.md](CHANGELOG.md)** - Version history and changes
+
+### Key Files
+
+- **`worker/simple_beat_detector.py`** - Music analysis engine
+- **`worker/video_processor.py`** - Video processing pipeline
+- **`worker/fcp7_xml_generator.py`** - Premiere Pro export
+- **`tests/test_autocut_e2e.py`** - E2E test suite
+
+### Quick Commands
+
+```bash
+# Start development
+cd worker && uvicorn main:app --port 8123 --reload &
+cd app && pnpm tauri dev
+
+# Run tests
+pnpm run test:e2e
+
+# Check system health
+curl http://127.0.0.1:8123/ping
+
+# Analyze music
+curl -X POST http://127.0.0.1:8123/analyze_music \
+  -H "Content-Type: application/json" \
+  -d '{"music_path": "/path/music.wav", "target_duration": 30}'
+```
+
+### Common Issues
+
+| Issue | Quick Fix |
+|-------|-----------|
+| Music starts at 0.0s | Check music start detection logs |
+| Clips not synced | Verify beat detection accuracy |
+| FFmpeg errors | Check file formats and permissions |
+| API connection failed | Verify worker is running on correct port |
