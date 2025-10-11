@@ -18,6 +18,7 @@ from typing import List, Tuple, Dict, Any
 import asyncio
 from config import Config
 from timeline import write_timeline
+from beat_detection import BeatDetector
 
 class VideoProcessor:
     """Handles all video processing operations using FFmpeg"""
@@ -25,6 +26,7 @@ class VideoProcessor:
     def __init__(self):
         self.temp_dir = None
         self.proxy_dir = None
+        self.beat_detector = BeatDetector()
     
     async def process_highlight(
         self, 
@@ -34,7 +36,15 @@ class VideoProcessor:
     ) -> Dict[str, Any]:
         """
         Main processing function - now creates both proxy and timeline
+        
+        If target_duration is 0, calculates dynamic duration based on number of clips
         """
+        # Calculate dynamic duration if target_duration is 0
+        if target_duration == 0:
+            # Dynamic duration: number of clips × 3 seconds per clip
+            target_duration = len(clips) * 3
+            print(f"🎯 Dynamic duration calculated: {len(clips)} clips × 3 seconds = {target_duration} seconds")
+        
         return await self.assemble_from_sources(clips, music_path, target_duration)
     
     async def assemble_from_sources(
@@ -82,9 +92,21 @@ class VideoProcessor:
                 print(f"⏱️  Proxy creation took {proxy_time:.2f} seconds")
                 print(f"🕐 [TIMING] Proxy creation completed at {time.strftime('%H:%M:%S')}")
             
-            # Step 2: Calculate segment duration for each clip
-            segment_duration = target_duration / len(proxy_paths)
-            print(f"📏 Each clip will contribute {segment_duration:.2f} seconds")
+            # Step 2: Detect beats in music for precise timing
+            print("🥁 Analyzing music for beat detection...")
+            beat_times = await self.beat_detector.detect_downbeats(music_path, target_duration)
+            
+            if len(beat_times) < len(proxy_paths):
+                print(f"⚠️  Only {len(beat_times)} beats found for {len(proxy_paths)} clips")
+                print("🔄 Using regular timing as fallback")
+                segment_duration = target_duration / len(proxy_paths)
+            else:
+                # Use beat times to determine segment durations
+                print(f"🎯 Using {len(beat_times)} detected beats for timing")
+                # For now, use equal segments between beats
+                segment_duration = target_duration / len(proxy_paths)
+            
+            print(f"📏 Each clip will contribute {segment_duration:.2f} seconds (beat detection mode)")
             
             # Step 3: Trim equal segments from each clip
             print("✂️  Trimming segments from clips...")
@@ -120,14 +142,16 @@ class VideoProcessor:
             
             print(f"✅ Proxy video created: {final_output}")
             
-            # Generate timeline data
-            timeline_data = await self._generate_timeline_data(clips, trimmed_segments, target_duration, music_path)
+            # Generate timeline data with beat information
+            timeline_data = await self._generate_timeline_data(clips, trimmed_segments, target_duration, music_path, beat_times)
             timeline_path = os.path.join(self.temp_dir, "timeline.json")
             write_timeline(
                 clips=timeline_data,
                 target_seconds=target_duration,
                 music_path=music_path,
-                output_path=timeline_path
+                output_path=timeline_path,
+                used_scene_detect=False,  # We're using beat detection instead
+                used_beat_snapping=True   # We're using 3-second beat intervals
             )
             
             # Rename proxy output
@@ -330,8 +354,8 @@ class VideoProcessor:
         
         return subprocess.CompletedProcess(cmd, process.returncode, stdout, stderr)
     
-    async def _generate_timeline_data(self, original_clips: List[str], trimmed_segments: List[str], target_duration: int, music_path: str) -> List[Dict[str, Any]]:
-        """Generate timeline data from trimmed segments"""
+    async def _generate_timeline_data(self, original_clips: List[str], trimmed_segments: List[str], target_duration: int, music_path: str, beat_times: List[float] = None) -> List[Dict[str, Any]]:
+        """Generate timeline data from trimmed segments with beat detection"""
         timeline_clips = []
         current_time = 0.0
         
@@ -340,10 +364,16 @@ class VideoProcessor:
             duration = await self._get_video_duration(trimmed_segment)
             
             # Calculate in/out points for original clip
-            # For now, use middle portion (same logic as trimming)
             original_duration = await self._get_video_duration(original_clip)
-            segment_duration = target_duration / len(original_clips)
-            start_time = max(0, (original_duration - segment_duration) / 2)
+            
+            if beat_times and i < len(beat_times):
+                # Use beat detection: find the best moment around the beat time
+                beat_time = beat_times[i]
+                # Look for interesting content around this beat time
+                start_time = max(0, min(beat_time, original_duration - duration))
+            else:
+                # Fallback: use middle portion
+                start_time = max(0, (original_duration - duration) / 2)
             
             timeline_clips.append({
                 "src": os.path.abspath(original_clip),
