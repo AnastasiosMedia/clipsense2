@@ -22,6 +22,7 @@ from config import Config
 from ffmpeg_checker import FFmpegChecker
 from simple_beat_detector import SimpleBeatDetector
 from fcp7_xml_generator import generate_fcp7_xml
+from visual_analyzer import VisualAnalyzer
 
 # Global state
 ffmpeg_available = False
@@ -154,6 +155,29 @@ class FCP7XMLResponse(BaseModel):
     """Response model for FCP7 XML generation"""
     ok: bool
     xml_path: Optional[str] = None
+    error: Optional[str] = None
+
+
+class VisualAnalysisRequest(BaseModel):
+    """Request model for visual analysis"""
+    video_path: str
+    sample_rate: float = 1.0
+
+
+class VisualAnalysisResponse(BaseModel):
+    """Response model for visual analysis"""
+    ok: bool
+    clip_path: Optional[str] = None
+    duration: Optional[float] = None
+    face_count: Optional[int] = None
+    face_confidence: Optional[float] = None
+    motion_score: Optional[float] = None
+    brightness_score: Optional[float] = None
+    contrast_score: Optional[float] = None
+    stability_score: Optional[float] = None
+    overall_quality: Optional[float] = None
+    best_moments: Optional[List[float]] = None
+    analysis_duration: Optional[float] = None
     error: Optional[str] = None
 
 @app.get("/")
@@ -348,6 +372,50 @@ async def generate_fcp7_xml_endpoint(request: FCP7XMLRequest):
         error_msg = f"FCP7 XML generation error: {str(e)}"
         print(f"❌ FCP7 XML generation exception: {type(e).__name__}: {e}")
         return FCP7XMLResponse(ok=False, error=error_msg)
+
+
+@app.post("/analyze_visual", response_model=VisualAnalysisResponse)
+async def analyze_visual_endpoint(request: VisualAnalysisRequest):
+    """
+    Analyze video content for visual quality and interesting moments
+    
+    Args:
+        request: VisualAnalysisRequest containing video path and sample rate
+        
+    Returns:
+        VisualAnalysisResponse with visual analysis results
+    """
+    try:
+        # Validate video file exists
+        if not os.path.exists(request.video_path):
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Video file not found: {request.video_path}"
+            )
+        
+        # Perform visual analysis
+        analyzer = VisualAnalyzer()
+        result = await analyzer.analyze_clip(request.video_path, request.sample_rate)
+        
+        return VisualAnalysisResponse(
+            ok=True,
+            clip_path=result.clip_path,
+            duration=result.duration,
+            face_count=result.face_count,
+            face_confidence=result.face_confidence,
+            motion_score=result.motion_score,
+            brightness_score=result.brightness_score,
+            contrast_score=result.contrast_score,
+            stability_score=result.stability_score,
+            overall_quality=result.overall_quality,
+            best_moments=result.best_moments,
+            analysis_duration=result.analysis_duration
+        )
+        
+    except Exception as e:
+        error_msg = f"Visual analysis error: {str(e)}"
+        print(f"❌ Visual analysis exception: {type(e).__name__}: {e}")
+        return VisualAnalysisResponse(ok=False, error=error_msg)
 
 
 @app.get("/health")

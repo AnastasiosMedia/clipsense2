@@ -19,6 +19,7 @@ import asyncio
 from config import Config
 from timeline import write_timeline
 from simple_beat_detector import SimpleBeatDetector
+from visual_analyzer import VisualAnalyzer
 
 class VideoProcessor:
     """Handles all video processing operations using FFmpeg"""
@@ -27,6 +28,7 @@ class VideoProcessor:
         self.temp_dir = None
         self.proxy_dir = None
         self.beat_detector = SimpleBeatDetector()
+        self.visual_analyzer = VisualAnalyzer()
     
     async def process_highlight(
         self, 
@@ -309,7 +311,7 @@ class VideoProcessor:
         return trimmed_segments
     
     async def _trim_segments_with_bars(self, proxy_paths: List[str], bar_times: List[float], target_duration: float) -> List[str]:
-        """Trim segments using bar detection for precise clip alignment"""
+        """Trim segments using bar detection and visual analysis for optimal clip selection"""
         trimmed_segments = []
         
         # Calculate segment durations based on bar intervals
@@ -341,12 +343,33 @@ class VideoProcessor:
             # This ensures we get interesting content at the right musical moment
             video_time = bar_time % duration
             
-            # Look for the best moment around this video time
-            start_time = max(0, min(video_time, duration - segment_duration))
+            # 🎨 VISUAL INTELLIGENCE: Find the best moment using visual analysis
+            print(f"🎬 Analyzing clip {i+1}/{len(proxy_paths)} for best moments...")
             
-            # If the mapped time is too close to the end, use the middle
+            # Define search window around the bar-suggested time
+            search_window = min(10.0, duration * 0.3)  # Search up to 10s or 30% of video
+            search_start = max(0, video_time - search_window / 2)
+            search_end = min(duration, search_start + search_window)
+            
+            # Find best moments within the search window
+            best_moments = await self.visual_analyzer.find_best_moments_in_duration(
+                proxy_path, search_start, search_end - search_start
+            )
+            
+            if best_moments:
+                # Use the best moment, adjusted for search window
+                best_moment = best_moments[0] - search_start  # Convert back to relative time
+                start_time = max(0, min(best_moment, duration - segment_duration))
+                print(f"🎯 Found best moment at {start_time:.2f}s (quality-based selection)")
+            else:
+                # Fallback to bar-based timing
+                start_time = max(0, min(video_time, duration - segment_duration))
+                print(f"🎵 Using bar-based timing at {start_time:.2f}s (fallback)")
+            
+            # If the selected time is too close to the end, use the middle
             if start_time + segment_duration > duration:
                 start_time = max(0, (duration - segment_duration) / 2)
+                print(f"⚠️  Adjusted to middle of clip: {start_time:.2f}s")
             
             trimmed_path = os.path.join(self.temp_dir, f"trimmed_bar_{i:03d}.mp4")
             
