@@ -7,11 +7,13 @@
 #### Music Start Detection Problems
 
 **Symptoms**:
+
 - Video starts with silence despite music having intro
 - Bar markers start at 0.0s instead of actual music start
 - First clip appears before music begins
 
 **Debug Steps**:
+
 ```bash
 # Test music analysis directly
 curl -X POST http://127.0.0.1:8123/analyze_music \
@@ -23,6 +25,7 @@ grep "Music starts at" /path/to/worker/logs
 ```
 
 **Solutions**:
+
 - Verify audio file format (WAV preferred for analysis)
 - Check if music has very quiet intro (below 10% threshold)
 - Manually adjust threshold in `simple_beat_detector.py`
@@ -30,11 +33,13 @@ grep "Music starts at" /path/to/worker/logs
 #### Beat Detection Inaccuracy
 
 **Symptoms**:
+
 - Clips don't align with musical beats
 - Tempo detection seems wrong
 - Bar intervals are inconsistent
 
 **Debug Steps**:
+
 ```bash
 # Check tempo detection
 python3 -c "
@@ -53,6 +58,7 @@ asyncio.run(test())
 ```
 
 **Solutions**:
+
 - Check if music has tempo changes (not supported yet)
 - Verify music is within 60-200 BPM range
 - Try different music file if confidence is low
@@ -60,6 +66,7 @@ asyncio.run(test())
 ### Music Analysis Logs
 
 **Key Log Messages**:
+
 ```
 🎵 Detecting musical content start...
 🎼 Music starts at: 0.42s
@@ -72,6 +79,7 @@ asyncio.run(test())
 ```
 
 **Error Patterns**:
+
 - `Music start detection failed` → Audio format issue
 - `Tempo candidates: [200.0, 200.0, 200.0]` → Detection failed, using fallback
 - `Confidence: 0.2` → Low confidence, may need different music
@@ -81,11 +89,13 @@ asyncio.run(test())
 ### Timeline Generation Issues
 
 **Symptoms**:
+
 - Bar markers reset to 0.0 in timeline.json
 - Clips don't align with musical timing
 - Timeline hash doesn't match expected
 
 **Debug Steps**:
+
 ```bash
 # Check timeline structure
 cat timeline.json | python3 -c "
@@ -101,6 +111,7 @@ grep "Writing timeline with bar markers" /path/to/logs
 ```
 
 **Solutions**:
+
 - Check if `_align_to_grid` is preserving offset
 - Verify music analysis is working correctly
 - Ensure bar markers are passed through pipeline
@@ -108,11 +119,13 @@ grep "Writing timeline with bar markers" /path/to/logs
 ### Video Processing Errors
 
 **Symptoms**:
+
 - FFmpeg errors during processing
 - Clips not trimming correctly
 - Audio overlay fails
 
 **Debug Steps**:
+
 ```bash
 # Check FFmpeg installation
 ffmpeg -version
@@ -126,6 +139,7 @@ ls -la /tmp/clipsense_*
 ```
 
 **Common FFmpeg Errors**:
+
 - `No such file or directory` → File path issue
 - `Invalid data found` → Corrupted video file
 - `Permission denied` → File permission issue
@@ -135,6 +149,7 @@ ls -la /tmp/clipsense_*
 ### API Endpoint Issues
 
 **Test All Endpoints**:
+
 ```bash
 # Health check
 curl http://127.0.0.1:8123/ping
@@ -158,6 +173,7 @@ curl -X POST http://127.0.0.1:8123/generate_fcp7_xml \
 ### Performance Issues
 
 **Check System Resources**:
+
 ```bash
 # CPU usage
 top -p $(pgrep -f "uvicorn main:app")
@@ -170,6 +186,7 @@ df -h /tmp
 ```
 
 **Optimize Settings**:
+
 ```python
 # In worker/config.py
 FFMPEG_PRESET = "ultrafast"  # Faster encoding
@@ -179,6 +196,7 @@ FFMPEG_CRF = 28              # Lower quality, faster
 ### Log Analysis
 
 **Backend Logs**:
+
 ```bash
 # Follow worker logs
 tail -f /path/to/worker/logs
@@ -191,6 +209,7 @@ grep "TIMING" /path/to/worker/logs
 ```
 
 **Frontend Logs**:
+
 - Open browser developer tools (F12)
 - Check Console tab for JavaScript errors
 - Check Network tab for API call failures
@@ -200,6 +219,7 @@ grep "TIMING" /path/to/worker/logs
 ### E2E Test Failures
 
 **Run Tests with Verbose Output**:
+
 ```bash
 # Full test suite
 pytest tests/test_autocut_e2e.py -v -s
@@ -212,6 +232,7 @@ ENABLE_TIMING_LOGS=true pytest tests/test_autocut_e2e.py -v -s
 ```
 
 **Check Test Assets**:
+
 ```bash
 # Generate test assets
 python tests/e2e_assets.py
@@ -225,12 +246,14 @@ ffprobe tests/media/music.wav
 ### Test Environment Issues
 
 **Common Problems**:
+
 - FFmpeg not in PATH
 - Python dependencies missing
 - Port conflicts
 - File permission issues
 
 **Solutions**:
+
 ```bash
 # Install dependencies
 pip install -r worker/requirements.txt
@@ -252,6 +275,7 @@ rm -rf /tmp/clipsense_*
 ### Memory Usage
 
 **Monitor Memory**:
+
 ```bash
 # Python process memory
 ps aux | grep python | grep uvicorn
@@ -262,6 +286,7 @@ vm_stat  # macOS
 ```
 
 **Memory Issues**:
+
 - Large video files consuming memory
 - Music analysis loading entire audio file
 - FFmpeg processes not cleaning up
@@ -269,6 +294,7 @@ vm_stat  # macOS
 ### Processing Speed
 
 **Timing Analysis**:
+
 ```bash
 # Enable timing logs
 export ENABLE_TIMING_LOGS=true
@@ -278,6 +304,7 @@ grep "TIMING" /path/to/logs
 ```
 
 **Speed Optimization**:
+
 - Use faster FFmpeg presets
 - Reduce video resolution
 - Limit music analysis duration
@@ -306,6 +333,7 @@ curl http://127.0.0.1:8123/ping
 ### Data Recovery
 
 **Timeline Recovery**:
+
 ```bash
 # Find timeline files
 find /tmp -name "timeline.json" -type f
@@ -320,6 +348,7 @@ print('Valid timeline:', 'clips' in t and 'bar_markers' in t)
 ```
 
 **Video Recovery**:
+
 ```bash
 # Find output files
 find /tmp -name "highlight_*.mp4" -type f
@@ -335,17 +364,20 @@ ffprobe -v quiet -print_format json -show_format /path/highlight.mp4
 ### Debug Information to Collect
 
 1. **System Information**:
+
    - OS version and architecture
    - Python version: `python --version`
    - FFmpeg version: `ffmpeg -version`
    - Node.js version: `node --version`
 
 2. **Error Logs**:
+
    - Backend logs (terminal output)
    - Frontend logs (browser console)
    - System logs (if applicable)
 
 3. **Test Files**:
+
    - Sample video and audio files
    - Generated timeline.json
    - Error output from failed operations
@@ -357,14 +389,14 @@ ffprobe -v quiet -print_format json -show_format /path/highlight.mp4
 
 ### Common Solutions
 
-| Problem | Solution |
-|---------|----------|
-| Music starts at 0.0s | Check music start detection logs |
-| Clips not synced | Verify beat detection accuracy |
-| FFmpeg errors | Check file formats and permissions |
-| API connection failed | Verify worker is running on correct port |
-| Timeline generation fails | Check bar marker preservation |
+| Problem                   | Solution                                 |
+| ------------------------- | ---------------------------------------- |
+| Music starts at 0.0s      | Check music start detection logs         |
+| Clips not synced          | Verify beat detection accuracy           |
+| FFmpeg errors             | Check file formats and permissions       |
+| API connection failed     | Verify worker is running on correct port |
+| Timeline generation fails | Check bar marker preservation            |
 
 ---
 
-*For more technical details, see [TECHNICAL_DOCS.md](TECHNICAL_DOCS.md)*
+_For more technical details, see [TECHNICAL_DOCS.md](TECHNICAL_DOCS.md)_

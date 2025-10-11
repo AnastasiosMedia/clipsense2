@@ -127,10 +127,12 @@ class VideoProcessor:
             for seg in trimmed_segments:
                 actual_duration += await self._get_video_duration(seg)
             
-            if actual_duration < target_duration * 0.9:  # If we're significantly short
-                print(f"⚠️  Actual duration {actual_duration:.2f}s is shorter than target {target_duration}s")
-                print("🔄 Will loop segments to reach target duration")
-                trimmed_segments = await self._loop_segments_to_duration(trimmed_segments, target_duration)
+            print(f"📊 Natural duration: {actual_duration:.2f}s from {len(trimmed_segments)} clips")
+            print(f"🎯 Target duration: {target_duration}s (will use natural duration)")
+            print(f"🔍 DEBUG: actual_duration = {actual_duration}, type = {type(actual_duration)}")
+            
+            # Use natural duration instead of forcing target duration
+            # This ensures clips are not looped and duration matches actual content
             
             # Step 4: Concatenate all segments
             print("🔗 Concatenating segments...")
@@ -153,14 +155,17 @@ class VideoProcessor:
             print(f"✅ Proxy video created: {final_output}")
             
             # Generate timeline data with music analysis
-            timeline_data = await self._generate_timeline_data(clips, trimmed_segments, target_duration, music_path, beat_times, bar_times)
+            timeline_data = await self._generate_timeline_data(clips, trimmed_segments, actual_duration, music_path, beat_times, bar_times)
             timeline_path = os.path.join(self.temp_dir, "timeline.json")
             
             print(f"📝 Writing timeline with bar markers starting at {bar_times[0]:.3f}s")
+            print(f"📊 Timeline will use actual duration: {actual_duration:.2f}s")
+            
+            print(f"🔍 DEBUG: About to write timeline with target_seconds = {int(actual_duration)}")
             
             write_timeline(
                 clips=timeline_data,
-                target_seconds=target_duration,
+                target_seconds=int(actual_duration),  # Use actual duration instead of target
                 music_path=music_path,
                 output_path=timeline_path,
                 used_scene_detect=False,  # We're using music analysis instead
@@ -319,11 +324,21 @@ class VideoProcessor:
         for i in range(len(bar_times) - 1):
             bar_intervals.append(bar_times[i + 1] - bar_times[i])
         
-        # If we have more clips than bars, extend the last interval
+        # If we have more clips than bar intervals, extend the last interval
         if len(proxy_paths) > len(bar_intervals):
-            last_interval = bar_intervals[-1] if bar_intervals else 2.0
+            if bar_intervals:
+                last_interval = bar_intervals[-1]
+            else:
+                # Fallback: calculate average interval from bar times
+                if len(bar_times) > 1:
+                    last_interval = (bar_times[-1] - bar_times[0]) / (len(bar_times) - 1)
+                else:
+                    last_interval = 2.0
+            
             while len(bar_intervals) < len(proxy_paths):
                 bar_intervals.append(last_interval)
+            
+            print(f"🔧 Extended bar intervals for {len(proxy_paths)} clips: {len(bar_intervals)} intervals")
         
         print(f"🎼 Bar intervals: {[f'{bi:.2f}s' for bi in bar_intervals[:len(proxy_paths)]]}")
         
@@ -464,7 +479,7 @@ class VideoProcessor:
         cmd = [
             "ffmpeg", "-y",
             "-i", os.path.abspath(video_path),
-            "-stream_loop", "-1", "-i", os.path.abspath(music_path),
+            "-i", os.path.abspath(music_path),
             "-filter_complex", 
             "[1:a]loudnorm=I=-14:TP=-1.5:LRA=11,aresample=48000,pan=stereo|FL=c0|FR=c1[a]",
             "-map", "0:v:0",
@@ -473,7 +488,7 @@ class VideoProcessor:
             "-c:a", "aac",
             "-ac", "2",
             "-b:a", "192k",
-            "-shortest",
+            "-shortest",  # Use shortest duration (video duration)
             final_path
         ]
         
@@ -520,9 +535,23 @@ class VideoProcessor:
         # Use bar times if available, otherwise fall back to beat times
         timing_markers = bar_times if bar_times else beat_times
         
-        for i, (original_clip, trimmed_segment) in enumerate(zip(original_clips, trimmed_segments)):
-            # Get duration of trimmed segment
-            duration = await self._get_video_duration(trimmed_segment)
+        # Ensure we process all clips, even if we have more clips than trimmed segments
+        max_clips = max(len(original_clips), len(trimmed_segments))
+        
+        for i in range(max_clips):
+            if i < len(original_clips) and i < len(trimmed_segments):
+                # We have both original and trimmed segment
+                original_clip = original_clips[i]
+                trimmed_segment = trimmed_segments[i]
+                duration = await self._get_video_duration(trimmed_segment)
+            elif i < len(original_clips):
+                # We have original clip but no trimmed segment - use full clip
+                original_clip = original_clips[i]
+                duration = await self._get_video_duration(original_clip)
+                print(f"⚠️  Using full clip {i+1} (no trimmed segment available)")
+            else:
+                # This shouldn't happen, but skip if it does
+                continue
             
             # Calculate in/out points for original clip
             original_duration = await self._get_video_duration(original_clip)

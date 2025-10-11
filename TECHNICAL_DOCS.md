@@ -363,6 +363,7 @@ worker/
 ### Planned Features
 
 #### Phase 1: Visual Intelligence (Recommended Next)
+
 **Impact: HIGH | Effort: MEDIUM**
 
 - **Smart Scene Detection**: OpenCV-based content analysis
@@ -371,19 +372,21 @@ worker/
 - **Content-Aware Cuts**: Visual beats + musical beats
 
 **Technical Implementation**:
+
 ```python
 # New module: worker/visual_analyzer.py
 class VisualAnalyzer:
     def analyze_clip(self, video_path: str) -> Dict[str, float]:
         # Face detection, motion analysis, quality scoring
         pass
-    
+
     def find_best_moments(self, clip_path: str, duration: float) -> List[float]:
         # Find most interesting moments within duration
         pass
 ```
 
 #### Phase 2: Advanced Music Analysis
+
 **Impact: HIGH | Effort: MEDIUM**
 
 - **Dynamic Tempo**: Handle tempo changes within songs
@@ -392,6 +395,7 @@ class VisualAnalyzer:
 - **Key Detection**: Musical key changes for dramatic effect
 
 #### Phase 3: Professional Video Features
+
 **Impact: HIGH | Effort: MEDIUM-HIGH**
 
 - **Transitions**: Smart crossfades, dissolves, wipes
@@ -400,6 +404,7 @@ class VisualAnalyzer:
 - **Aspect Ratio Handling**: Smart cropping
 
 #### Phase 4: AI-Powered Content Selection
+
 **Impact: VERY HIGH | Effort: HIGH**
 
 - **Face Recognition**: Specific people prioritization

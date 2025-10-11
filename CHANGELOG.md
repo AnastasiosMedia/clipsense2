@@ -94,11 +94,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Version History
 
-| Version | Date       | Major Changes                                     |
-| ------- | ---------- | ------------------------------------------------- |
+| Version | Date       | Major Changes                                        |
+| ------- | ---------- | ---------------------------------------------------- |
 | 2.1.0   | 2025-10-11 | Visual Intelligence Phase 1, smart content selection |
-| 2.0.0   | 2025-10-11 | Advanced beat detection, Premiere Pro integration |
-| 1.0.0   | 2025-10-10 | Core video processing, basic music overlay        |
+| 2.0.0   | 2025-10-11 | Advanced beat detection, Premiere Pro integration    |
+| 1.0.0   | 2025-10-10 | Core video processing, basic music overlay           |
 
 ## Migration Guide
 
