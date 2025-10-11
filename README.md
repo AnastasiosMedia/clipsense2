@@ -519,9 +519,82 @@ curl -X POST http://127.0.0.1:8123/analyze_music \
 
 ### Common Issues
 
-| Issue | Quick Fix |
-|-------|-----------|
-| Music starts at 0.0s | Check music start detection logs |
-| Clips not synced | Verify beat detection accuracy |
-| FFmpeg errors | Check file formats and permissions |
+| Issue                 | Quick Fix                                |
+| --------------------- | ---------------------------------------- |
+| Music starts at 0.0s  | Check music start detection logs         |
+| Clips not synced      | Verify beat detection accuracy           |
+| FFmpeg errors         | Check file formats and permissions       |
 | API connection failed | Verify worker is running on correct port |
+
+## 🚀 Future Development Roadmap
+
+### 🎯 Current State Analysis
+
+**✅ What's Working Well:**
+- Robust beat detection with music start detection
+- Perfect bar-synced video timing
+- Premiere Pro integration (FCP7 XML)
+- Two-stage pipeline (assemble + conform)
+- Comprehensive testing suite
+- Professional-quality output
+
+### 🚀 Next Level Opportunities
+
+#### 1. 🎨 Visual Intelligence & Scene Detection
+**Impact: HIGH | Effort: MEDIUM**
+
+- **Smart Scene Detection**: Analyze video content to find the most interesting moments (faces, action, emotion)
+- **Content-Aware Cuts**: Cut on visual beats (camera movements, subject changes) not just musical beats
+- **Emotion Detection**: Prioritize clips with smiles, laughter, key moments
+- **Quality Scoring**: Rank clips by visual quality (stability, lighting, composition)
+
+#### 2. 🎵 Advanced Music Analysis
+**Impact: HIGH | Effort: MEDIUM**
+
+- **Dynamic Tempo Detection**: Handle tempo changes within songs
+- **Genre-Specific Timing**: Different cut patterns for different music styles
+- **Energy Mapping**: Match high-energy video to high-energy music sections
+- **Key Detection**: Musical key changes for dramatic effect
+
+#### 3. 🎬 Professional Video Features
+**Impact: HIGH | Effort: MEDIUM-HIGH**
+
+- **Transitions**: Smart crossfades, dissolves, wipes between clips
+- **Color Grading**: Automatic color correction and style matching
+- **Stabilization**: Fix shaky footage automatically
+- **Aspect Ratio Handling**: Smart cropping for different output formats
+
+#### 4. 🤖 AI-Powered Content Selection
+**Impact: VERY HIGH | Effort: HIGH**
+
+- **Face Recognition**: Prioritize clips with specific people
+- **Object Detection**: Find clips with wedding rings, cake, dancing
+- **Sentiment Analysis**: Detect emotional moments
+- **Story Arc**: Create narrative flow (ceremony → reception → party)
+
+#### 5. 🎛️ User Control & Customization
+**Impact: MEDIUM | Effort: MEDIUM**
+
+- **Style Presets**: "Romantic", "Energetic", "Cinematic", "Documentary"
+- **Manual Override**: Let users adjust timing, select specific clips
+- **Preview System**: Real-time preview before final render
+- **Batch Processing**: Handle multiple projects at once
+
+### 🎯 Recommended Next Steps
+
+**Phase 1: Smart Scene Detection**
+- Analyze each video clip for interesting moments
+- Score clips by visual quality and content
+- Cut to the best moments within each bar interval
+- Add face detection to prioritize people
+
+**Phase 2: Content-Aware Timing**
+- Match visual energy to musical energy
+- Add transitions between clips
+- Implement basic color correction
+
+**Why Start with Visual Intelligence:**
+- **Immediate Impact**: Videos will look much more professional
+- **Builds on Existing**: Enhances our current beat detection
+- **User Value**: Clear improvement in output quality
+- **Technical Feasibility**: We can use OpenCV + existing Python stack
