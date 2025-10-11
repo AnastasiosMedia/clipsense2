@@ -9,6 +9,9 @@ A privacy-first desktop MVP app that automatically creates highlight videos from
 - ⚡ Auto-generate highlight videos with **perfect musical timing**
 - 🎼 **Music start detection** - no more awkward silence
 - 🎯 **Bar-synced cuts** - clips start exactly on musical beats
+- 🎨 **Visual Intelligence** - smart content selection and quality analysis
+- 👥 **Face detection** - prioritize clips with people
+- 📊 **Quality scoring** - brightness, contrast, stability analysis
 - 🎞️ **Premiere Pro integration** - FCP7 XML export
 - 🔒 100% local processing - no cloud, no login
 - 🎨 Modern dark UI with Tailwind CSS
@@ -19,6 +22,7 @@ A privacy-first desktop MVP app that automatically creates highlight videos from
 - **Backend**: Python FastAPI worker with advanced music analysis
 - **Media Engine**: FFmpeg + ffprobe CLI calls
 - **Beat Detection**: librosa-based tempo and bar detection
+- **Visual Intelligence**: OpenCV-based content analysis and quality scoring
 - **Communication**: localhost:8123 API calls
 
 ## Quick Start
@@ -357,6 +361,34 @@ Response:
 }
 ```
 
+**POST `/analyze_visual`** - Analyze video content for visual quality
+
+```json
+{
+  "video_path": "/path/video.mp4",
+  "sample_rate": 1.0
+}
+```
+
+Response:
+
+```json
+{
+  "ok": true,
+  "clip_path": "/path/video.mp4",
+  "duration": 10.0,
+  "face_count": 2,
+  "face_confidence": 0.8,
+  "motion_score": 0.3,
+  "brightness_score": 0.9,
+  "contrast_score": 0.7,
+  "stability_score": 0.8,
+  "overall_quality": 0.75,
+  "best_moments": [1.2, 3.4, 5.6],
+  "analysis_duration": 1.2
+}
+```
+
 ### Command Line Interface
 
 Process timeline files offline:
@@ -531,6 +563,7 @@ curl -X POST http://127.0.0.1:8123/analyze_music \
 ### 🎯 Current State Analysis
 
 **✅ What's Working Well:**
+
 - Robust beat detection with music start detection
 - Perfect bar-synced video timing
 - Premiere Pro integration (FCP7 XML)
@@ -541,6 +574,7 @@ curl -X POST http://127.0.0.1:8123/analyze_music \
 ### 🚀 Next Level Opportunities
 
 #### 1. 🎨 Visual Intelligence & Scene Detection
+
 **Impact: HIGH | Effort: MEDIUM**
 
 - **Smart Scene Detection**: Analyze video content to find the most interesting moments (faces, action, emotion)
@@ -549,6 +583,7 @@ curl -X POST http://127.0.0.1:8123/analyze_music \
 - **Quality Scoring**: Rank clips by visual quality (stability, lighting, composition)
 
 #### 2. 🎵 Advanced Music Analysis
+
 **Impact: HIGH | Effort: MEDIUM**
 
 - **Dynamic Tempo Detection**: Handle tempo changes within songs
@@ -557,6 +592,7 @@ curl -X POST http://127.0.0.1:8123/analyze_music \
 - **Key Detection**: Musical key changes for dramatic effect
 
 #### 3. 🎬 Professional Video Features
+
 **Impact: HIGH | Effort: MEDIUM-HIGH**
 
 - **Transitions**: Smart crossfades, dissolves, wipes between clips
@@ -565,6 +601,7 @@ curl -X POST http://127.0.0.1:8123/analyze_music \
 - **Aspect Ratio Handling**: Smart cropping for different output formats
 
 #### 4. 🤖 AI-Powered Content Selection
+
 **Impact: VERY HIGH | Effort: HIGH**
 
 - **Face Recognition**: Prioritize clips with specific people
@@ -573,6 +610,7 @@ curl -X POST http://127.0.0.1:8123/analyze_music \
 - **Story Arc**: Create narrative flow (ceremony → reception → party)
 
 #### 5. 🎛️ User Control & Customization
+
 **Impact: MEDIUM | Effort: MEDIUM**
 
 - **Style Presets**: "Romantic", "Energetic", "Cinematic", "Documentary"
@@ -583,17 +621,20 @@ curl -X POST http://127.0.0.1:8123/analyze_music \
 ### 🎯 Recommended Next Steps
 
 **Phase 1: Smart Scene Detection**
+
 - Analyze each video clip for interesting moments
 - Score clips by visual quality and content
 - Cut to the best moments within each bar interval
 - Add face detection to prioritize people
 
 **Phase 2: Content-Aware Timing**
+
 - Match visual energy to musical energy
 - Add transitions between clips
 - Implement basic color correction
 
 **Why Start with Visual Intelligence:**
+
 - **Immediate Impact**: Videos will look much more professional
 - **Builds on Existing**: Enhances our current beat detection
 - **User Value**: Clear improvement in output quality

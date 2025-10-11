@@ -5,7 +5,16 @@ All notable changes to ClipSense will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.0] - 2025-10-11
+## [2.1.0] - 2025-10-11
+
+### 🎨 Added - Visual Intelligence (Phase 1)
+
+- **Smart Content Selection**: OpenCV-based analysis finds the most interesting moments
+- **Face Detection**: Prioritizes clips with people using Haar cascade detection
+- **Quality Scoring**: Comprehensive analysis of brightness, contrast, and stability
+- **Motion Analysis**: Detects dynamic content and camera movement
+- **Best Moment Identification**: Finds optimal cut points within video segments
+- **Content-Aware Cuts**: Combines musical timing with visual quality
 
 ### 🎵 Added - Advanced Music Features
 
@@ -85,30 +94,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Version History
 
-| Version | Date | Major Changes |
-|---------|------|---------------|
-| 2.0.0 | 2025-10-11 | Advanced beat detection, Premiere Pro integration |
-| 1.0.0 | 2025-10-10 | Core video processing, basic music overlay |
+| Version | Date       | Major Changes                                     |
+| ------- | ---------- | ------------------------------------------------- |
+| 2.1.0   | 2025-10-11 | Visual Intelligence Phase 1, smart content selection |
+| 2.0.0   | 2025-10-11 | Advanced beat detection, Premiere Pro integration |
+| 1.0.0   | 2025-10-10 | Core video processing, basic music overlay        |
 
 ## Migration Guide
 
 ### From v1.0.0 to v2.0.0
 
 **Breaking Changes**:
+
 - New music analysis requires `librosa` and `soundfile` dependencies
 - Timeline format includes new `bar_markers` field
 - API responses include additional music analysis data
 
 **Migration Steps**:
+
 1. Update Python dependencies: `pip install -r requirements.txt`
 2. Update frontend to handle new API response format
 3. Test with existing projects to verify compatibility
 
 **New Features**:
+
 - Music start detection works automatically
 - Bar-synced timing provides better results
 - Premiere Pro integration for professional workflows
 
 ---
 
-*For more details, see [TECHNICAL_DOCS.md](TECHNICAL_DOCS.md) and [README.md](README.md)*
+_For more details, see [TECHNICAL_DOCS.md](TECHNICAL_DOCS.md) and [README.md](README.md)_
