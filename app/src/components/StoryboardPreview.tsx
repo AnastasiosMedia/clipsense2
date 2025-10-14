@@ -276,6 +276,8 @@ const StoryboardPreview: React.FC<StoryboardPreviewProps> = ({
         </div>
 
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+          {/* Ensure a single root inside scroll area to avoid adjacent JSX parse issues */}
+          <div>
           {/* AI Selection Options - Always visible */}
           <div className="max-w-2xl mx-auto mb-8 space-y-6">
             <div className="text-center mb-6">
@@ -601,6 +603,7 @@ const StoryboardPreview: React.FC<StoryboardPreviewProps> = ({
               </div>
             </div>
           )}
+          </div>
         </div>
       </div>
     </div>
