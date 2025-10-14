@@ -2,7 +2,7 @@
  * API service for communicating with the Python FastAPI backend
  */
 
-import { AutoCutRequest, AutoCutResponse, HealthResponse } from '../types';
+import { AutoCutRequest, AutoCutResponse, HealthResponse, AISelectionRequest, AISelectionResponse } from '../types';
 import config from '../config';
 
 export class ApiService {
@@ -67,5 +67,28 @@ export class ApiService {
       method: 'POST',
       body: JSON.stringify(request),
     });
+  }
+
+  static async aiAutoCut(request: AISelectionRequest): Promise<AISelectionResponse> {
+    return this.request<AISelectionResponse>('/ai_autocut', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  }
+
+  // Async preview flow
+  static async previewStart(request: AutoCutRequest): Promise<{ ok: boolean; job_id?: string; error?: string }> {
+    return this.request<{ ok: boolean; job_id?: string; error?: string }>('/preview/start', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  }
+
+  static async previewStatus(jobId: string): Promise<{ ok: boolean; job_id: string; status: string; progress: number; current_step: string; error?: string }> {
+    return this.request<{ ok: boolean; job_id: string; status: string; progress: number; current_step: string; error?: string }>(`/preview/status/${jobId}`);
+  }
+
+  static async previewResult(jobId: string): Promise<{ ok: boolean; preview: any }> {
+    return this.request<{ ok: boolean; preview: any }>(`/preview/result/${jobId}`);
   }
 }

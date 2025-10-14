@@ -13,13 +13,22 @@ import tempfile
 import subprocess
 import math
 import time
+import shutil
 from pathlib import Path
 from typing import List, Tuple, Dict, Any
 import asyncio
-from config import Config
-from timeline import write_timeline
-from simple_beat_detector import SimpleBeatDetector
-from visual_analyzer import VisualAnalyzer
+try:
+    from .config import Config
+    from .timeline import write_timeline
+    from .simple_beat_detector import SimpleBeatDetector
+    from .visual_analyzer import VisualAnalyzer
+    from .ai_content_selector import AIContentSelector
+except ImportError:
+    from config import Config
+    from timeline import write_timeline
+    from simple_beat_detector import SimpleBeatDetector
+    from visual_analyzer import VisualAnalyzer
+    from ai_content_selector import AIContentSelector
 
 class VideoProcessor:
     """Handles all video processing operations using FFmpeg"""
@@ -29,6 +38,20 @@ class VideoProcessor:
         self.proxy_dir = None
         self.beat_detector = SimpleBeatDetector()
         self.visual_analyzer = VisualAnalyzer()
+        self.ai_selector = AIContentSelector() # New: Initialize AI Content Selector
+        
+        # Set default export directory
+        self.export_dir = "/Users/anastasiosk/Documents/devprojects/OS/clipsense2/tests/testwedding/Export"
+        os.makedirs(self.export_dir, exist_ok=True)
+    
+    async def _check_ffmpeg(self) -> bool:
+        """Check if FFmpeg is available"""
+        try:
+            result = subprocess.run(['ffmpeg', '-version'], 
+                                  capture_output=True, text=True, timeout=5)
+            return result.returncode == 0
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            return False
     
     async def process_highlight(
         self, 
@@ -49,6 +72,83 @@ class VideoProcessor:
         
         return await self.assemble_from_sources(clips, music_path, target_duration)
     
+    async def assemble_with_ai_selection(
+        self, 
+        clips: List[str], 
+        music_path: str, 
+        target_duration: int = 60,
+        story_style: str = 'traditional',
+        style_preset: str = 'romantic',
+        use_ai_selection: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Assemble stage with AI-powered content selection
+        
+        Args:
+            clips: List of video file paths
+            music_path: Path to music file
+            target_duration: Target duration in seconds
+            story_style: Story template ('traditional', 'modern', 'intimate', 'destination')
+            style_preset: Style preset ('romantic', 'energetic', 'cinematic', 'documentary')
+            use_ai_selection: Whether to use AI content selection
+            
+        Returns:
+            Dictionary with proxy output path, timeline path, and metrics
+        """
+        start_time = time.time()
+        
+        # Create temp directory
+        self.temp_dir = tempfile.mkdtemp(prefix="clipsense_ai_")
+        print(f"📁 Created temp directory: {self.temp_dir}")
+        
+        # Check FFmpeg availability
+        if not await self._check_ffmpeg():
+            return {"ok": False, "error": "FFmpeg not found"}
+        
+        try:
+            if use_ai_selection:
+                print("🤖 Using AI-powered content selection...")
+                
+                # Use AI to select best clips (with fast mode for better performance)
+                # Calculate target count: use more clips for longer durations
+                target_count = min(len(clips), max(8, target_duration // 2))  # More clips for better coverage
+                print(f"🎯 Target count calculation: {len(clips)} available, {target_duration}s duration → {target_count} clips")
+                
+                selected_clips = await self.ai_selector.select_best_clips(
+                    clips,
+                    target_count=target_count,
+                    story_style=story_style,
+                    style_preset=style_preset,
+                    fast_mode=True  # Use fast mode for better performance
+                )
+                
+                # Extract just the clip paths from AI selection results
+                selected_clip_paths = [result.clip_path for result in selected_clips]
+                
+                print(f"🎯 AI selected {len(selected_clip_paths)} clips from {len(clips)} available")
+                for i, result in enumerate(selected_clips[:3]):  # Show top 3
+                    print(f"  {i+1}. {os.path.basename(result.clip_path)} (score: {result.final_score:.2f})")
+                
+                # Use selected clips for processing
+                clips_to_process = selected_clip_paths
+            else:
+                print("📹 Using all provided clips...")
+                clips_to_process = clips
+            
+            # Continue with normal processing using selected clips
+            return await self.assemble_from_sources(clips_to_process, music_path, target_duration)
+            
+        except Exception as e:
+            print(f"❌ AI selection error: {e}")
+            # Fallback to normal processing
+            print("🔄 Falling back to normal processing...")
+            return await self.assemble_from_sources(clips, music_path, target_duration)
+        
+        finally:
+            # Cleanup temp directory
+            if self.temp_dir and os.path.exists(self.temp_dir):
+                shutil.rmtree(self.temp_dir, ignore_errors=True)
+
     async def assemble_from_sources(
         self, 
         clips: List[str], 
@@ -162,25 +262,43 @@ class VideoProcessor:
             print(f"📊 Timeline will use actual duration: {actual_duration:.2f}s")
             
             print(f"🔍 DEBUG: About to write timeline with target_seconds = {int(actual_duration)}")
+            print(f"🔍 DEBUG: timeline_data type: {type(timeline_data)}, length: {len(timeline_data) if timeline_data else 'None'}")
+            print(f"🔍 DEBUG: music_path: {music_path}")
+            print(f"🔍 DEBUG: timeline_path: {timeline_path}")
             
-            write_timeline(
-                clips=timeline_data,
-                target_seconds=int(actual_duration),  # Use actual duration instead of target
-                music_path=music_path,
-                output_path=timeline_path,
-                used_scene_detect=False,  # We're using music analysis instead
-                used_beat_snapping=True,  # We're using music-based timing
-                bar_markers=bar_times,
-                tempo=tempo,
-                time_signature=music_analysis.get('time_signature', '4/4')
-            )
+            try:
+                write_timeline(
+                    clips=timeline_data,
+                    target_seconds=int(actual_duration),  # Use actual duration instead of target
+                    music_path=music_path,
+                    output_path=timeline_path,
+                    used_scene_detect=False,  # We're using music analysis instead
+                    used_beat_snapping=True,  # We're using music-based timing
+                    bar_markers=bar_times,
+                    tempo=tempo,
+                    time_signature=music_analysis.get('time_signature', '4/4')
+                )
+                print(f"✅ Timeline written successfully: {timeline_path}")
+            except Exception as e:
+                print(f"❌ Timeline writing failed: {type(e).__name__}: {e}")
+                import traceback
+                traceback.print_exc()
+                # Continue without timeline for now
             
             # Rename proxy output
             proxy_output = os.path.join(self.temp_dir, "highlight_proxy.mp4")
             os.rename(final_output, proxy_output)
             
+            # Copy to export directory
+            export_filename = f"highlight_{int(time.time())}.mp4"
+            export_path = os.path.join(self.export_dir, export_filename)
+            shutil.copy2(proxy_output, export_path)
+            print(f"📁 Exported to: {export_path}")
+            
             return {
+                "ok": True,
                 "proxy_output": proxy_output,
+                "export_output": export_path,  # New: Export path
                 "timeline_path": timeline_path,
                 "timeline_hash": self._calculate_timeline_hash(timeline_path),
                 "proxy_time": proxy_time,
@@ -476,12 +594,16 @@ class VideoProcessor:
         """Overlay music and normalize audio to -14 LUFS"""
         final_path = os.path.abspath(os.path.join(self.temp_dir, "highlight_final.mp4"))
         
+        # Get video duration to ensure music matches exactly
+        video_duration = await self._get_video_duration(video_path)
+        print(f"🎵 Video duration: {video_duration:.2f}s, trimming music to match")
+        
         cmd = [
             "ffmpeg", "-y",
             "-i", os.path.abspath(video_path),
             "-i", os.path.abspath(music_path),
             "-filter_complex", 
-            "[1:a]loudnorm=I=-14:TP=-1.5:LRA=11,aresample=48000,pan=stereo|FL=c0|FR=c1[a]",
+            f"[1:a]atrim=duration={video_duration},loudnorm=I=-14:TP=-1.5:LRA=11,aresample=48000,pan=stereo|FL=c0|FR=c1[a]",
             "-map", "0:v:0",
             "-map", "[a]",
             "-c:v", "copy",
@@ -492,7 +614,7 @@ class VideoProcessor:
             final_path
         ]
         
-        print("Overlaying music and normalizing audio...")
+        print("🎵 Overlaying music and normalizing audio...")
         await self._run_ffmpeg(cmd)
         return final_path
     
@@ -582,6 +704,5 @@ class VideoProcessor:
     def _cleanup_temp_files(self):
         """Clean up temporary files and directories"""
         if self.temp_dir and os.path.exists(self.temp_dir):
-            import shutil
             shutil.rmtree(self.temp_dir)
             print(f"Cleaned up temporary directory: {self.temp_dir}")

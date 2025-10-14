@@ -6,6 +6,7 @@ Creates highlight videos by trimming, concatenating clips and overlaying music.
 """
 
 import os
+import asyncio
 import tempfile
 import subprocess
 import json
@@ -16,13 +17,28 @@ from typing import List, Optional, Dict, Any
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from video_processor import VideoProcessor
-from conform import ConformProcessor
-from config import Config
-from ffmpeg_checker import FFmpegChecker
-from simple_beat_detector import SimpleBeatDetector
-from fcp7_xml_generator import generate_fcp7_xml
-from visual_analyzer import VisualAnalyzer
+try:
+    # Try relative imports first (when run as module)
+    from .video_processor import VideoProcessor
+    from .conform import ConformProcessor
+    from .config import Config
+    from .ffmpeg_checker import FFmpegChecker
+    from .simple_beat_detector import SimpleBeatDetector
+    from .fcp7_xml_generator import generate_fcp7_xml
+    from .visual_analyzer import VisualAnalyzer
+    from .ai_content_selector import AIContentSelector
+    from .background_processor import background_processor, ProcessingStatus
+except ImportError:
+    # Fall back to absolute imports (when run directly)
+    from video_processor import VideoProcessor
+    from conform import ConformProcessor
+    from config import Config
+    from ffmpeg_checker import FFmpegChecker
+    from simple_beat_detector import SimpleBeatDetector
+    from fcp7_xml_generator import generate_fcp7_xml
+    from visual_analyzer import VisualAnalyzer
+    from ai_content_selector import AIContentSelector
+    from background_processor import background_processor, ProcessingStatus
 
 # Global state
 ffmpeg_available = False
@@ -97,11 +113,16 @@ class AutoCutRequest(BaseModel):
     clips: List[str]
     music: str
     target_seconds: int = 60
+    quality_settings: Optional[Dict[str, Any]] = None
+    story_style: Optional[str] = 'traditional'
+    style_preset: Optional[str] = 'romantic'
+    use_ai_selection: Optional[bool] = False
 
 class AutoCutResponse(BaseModel):
     """Response model for auto-cut processing"""
     ok: bool
     proxy_output: Optional[str] = None
+    export_output: Optional[str] = None  # New: Export path
     timeline_path: Optional[str] = None
     timeline_hash: Optional[str] = None
     error: Optional[str] = None
@@ -180,6 +201,57 @@ class VisualAnalysisResponse(BaseModel):
     analysis_duration: Optional[float] = None
     error: Optional[str] = None
 
+class AISelectionRequest(BaseModel):
+    """Request model for AI content selection"""
+    clips: List[str]
+    music_path: str
+    target_duration: int = 60
+    story_style: str = 'traditional'
+    style_preset: str = 'romantic'
+    use_ai_selection: bool = True
+
+class AISelectionResponse(BaseModel):
+    """Response model for AI content selection"""
+    ok: bool
+    proxy_output: Optional[str] = None
+    timeline_path: Optional[str] = None
+    timeline_hash: Optional[str] = None
+    proxy_time: Optional[float] = None
+    render_time: Optional[float] = None
+    total_time: Optional[float] = None
+    selected_clips: Optional[List[Dict[str, Any]]] = None
+    story_breakdown: Optional[Dict[str, Any]] = None
+    quality_metrics: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
+
+# Background Processing Models
+class BackgroundJobRequest(BaseModel):
+    """Request model for background processing"""
+    clips: List[str]
+    music_path: str
+    target_duration: int = 60
+    story_style: str = 'traditional'
+    style_preset: str = 'romantic'
+
+class BackgroundJobResponse(BaseModel):
+    """Response model for background job creation"""
+    ok: bool
+    job_id: Optional[str] = None
+    error: Optional[str] = None
+
+class JobStatusResponse(BaseModel):
+    """Response model for job status"""
+    ok: bool
+    job_id: str
+    status: str
+    progress: float
+    current_step: str
+    results: Optional[List[Dict[str, Any]]] = None
+    error: Optional[str] = None
+    created_at: float
+    started_at: Optional[float] = None
+    completed_at: Optional[float] = None
+
 @app.get("/")
 async def root():
     """Health check endpoint"""
@@ -232,6 +304,7 @@ async def auto_cut(request: AutoCutRequest):
         return AutoCutResponse(
             ok=True,
             proxy_output=result["proxy_output"],
+            export_output=result.get("export_output"),  # New: Export path
             timeline_path=result["timeline_path"],
             timeline_hash=result["timeline_hash"],
             proxy_time=result.get("proxy_time"),
@@ -417,6 +490,200 @@ async def analyze_visual_endpoint(request: VisualAnalysisRequest):
         print(f"❌ Visual analysis exception: {type(e).__name__}: {e}")
         return VisualAnalysisResponse(ok=False, error=error_msg)
 
+@app.post("/ai_autocut_simple")
+async def ai_autocut_simple_endpoint(request: AISelectionRequest):
+    """Simple AI endpoint for testing"""
+    print(f"🧪 Simple AI endpoint called with {len(request.clips)} clips")
+    try:
+        # Just return a simple response
+        return {
+            "ok": True,
+            "message": "Simple AI endpoint working",
+            "clips": len(request.clips),
+            "music": request.music_path
+        }
+    except Exception as e:
+        print(f"❌ Simple AI endpoint error: {e}")
+        import traceback
+        traceback.print_exc()
+        return {"ok": False, "error": str(e)}
+
+@app.post("/ai_autocut_test")
+async def ai_autocut_test_endpoint(request: AISelectionRequest):
+    """Test endpoint for AI autocut"""
+    print(f"🧪 AI test endpoint called with {len(request.clips)} clips")
+    return {"ok": True, "message": "AI test endpoint working", "clips": len(request.clips)}
+
+@app.post("/ai_autocut", response_model=AISelectionResponse)
+async def ai_autocut_endpoint(request: AISelectionRequest):
+    """
+    AI-powered autocut endpoint with intelligent content selection
+    
+    Args:
+        request: AISelectionRequest containing clips, music, and AI parameters
+        
+    Returns:
+        AISelectionResponse with AI-selected clips and analysis
+    """
+    print(f"🚀 AI autocut endpoint called with {len(request.clips)} clips")
+    print(f"🔍 Request details: clips={request.clips}, music={request.music_path}, duration={request.target_duration}")
+    try:
+        # Validate inputs
+        if not request.clips:
+            print("❌ No clips provided")
+            raise HTTPException(status_code=400, detail="No clips provided")
+        
+        if not os.path.exists(request.music_path):
+            print(f"❌ Music file not found: {request.music_path}")
+            raise HTTPException(status_code=400, detail=f"Music file not found: {request.music_path}")
+        
+        # Validate clip files
+        for clip_path in request.clips:
+            if not os.path.exists(clip_path):
+                print(f"❌ Clip file not found: {clip_path}")
+                raise HTTPException(status_code=400, detail=f"Clip file not found: {clip_path}")
+        
+        print(f"✅ Validation passed")
+        print(f"🤖 AI Autocut request: {len(request.clips)} clips, {request.target_duration}s, {request.story_style}/{request.style_preset}")
+        
+        # Process with AI selection
+        processor = VideoProcessor()
+        result = await processor.assemble_with_ai_selection(
+            clips=request.clips,
+            music_path=request.music_path,
+            target_duration=request.target_duration,
+            story_style=request.story_style,
+            style_preset=request.style_preset,
+            use_ai_selection=request.use_ai_selection
+        )
+        
+        print(f"🔍 AI result: {result}")
+        print(f"🔍 AI result type: {type(result)}")
+        print(f"🔍 AI result ok: {result.get('ok', 'MISSING')}")
+        
+        if not result.get("ok", False):
+            return AISelectionResponse(ok=False, error=result.get("error", "Unknown error"))
+        
+        # Get AI analysis if available
+        print("🤖 Getting AI analysis...")
+        ai_selector = AIContentSelector()
+        selected_clips = []
+        story_breakdown = {}
+        quality_metrics = {}
+        
+        if request.use_ai_selection:
+            try:
+                print("🎯 Calling AI selector...")
+                print(f"🎯 Request clips: {request.clips}")
+                print(f"🎯 Target count: {len(request.clips)}")
+                print(f"🎯 Story style: {request.story_style}")
+                print(f"🎯 Style preset: {request.style_preset}")
+                
+                # Get AI analysis for selected clips
+                ai_results = await ai_selector.select_best_clips(
+                    request.clips,
+                    target_count=len(request.clips),
+                    story_style=request.story_style,
+                    style_preset=request.style_preset
+                )
+                print(f"✅ AI selector returned {len(ai_results)} results")
+                
+                # Debug: Check if descriptions are present
+                for i, ai_result in enumerate(ai_results):
+                    print(f"🔍 Result {i+1}: description='{ai_result.description[:50] if ai_result.description else 'None'}...'")
+                    print(f"🔍 Result {i+1}: has description field: {hasattr(ai_result, 'description')}")
+                    print(f"🔍 Result {i+1}: description type: {type(ai_result.description)}")
+                    print(f"🔍 Result {i+1}: description value: {repr(ai_result.description)}")
+                
+                # Format selected clips info
+                selected_clips = []
+                for ai_result in ai_results:
+                    # Debug each result
+                    print(f"🔍 Processing AI result: {ai_result.clip_path}")
+                    print(f"🔍 Description: {repr(ai_result.description)}")
+                    print(f"🔍 Has description attr: {hasattr(ai_result, 'description')}")
+                    
+                    selected_clips.append({
+                        "path": ai_result.clip_path,
+                        "score": ai_result.final_score,
+                        "scene": ai_result.story_arc.scene_classification,
+                        "tone": ai_result.story_arc.emotional_tone,
+                        "importance": ai_result.story_arc.story_importance,
+                        "reason": ai_result.selection_reason,
+                        "description": ai_result.description if hasattr(ai_result, 'description') and ai_result.description else "Description not available",
+                        "object_analysis": {
+                            "key_moments": ai_result.object_analysis.key_moments,
+                            "scene_classification": ai_result.object_analysis.scene_classification,
+                            "objects_detected": ai_result.object_analysis.objects_detected
+                        },
+                        "story_arc": {
+                            "scene_classification": ai_result.story_arc.scene_classification,
+                            "emotional_tone": ai_result.story_arc.emotional_tone,
+                            "story_importance": ai_result.story_arc.story_importance
+                        }
+                    })
+                
+                # Get story breakdown
+                story_breakdown = {
+                    "scenes": {},
+                    "tones": {},
+                    "positions": {},
+                    "total_clips": len(ai_results)
+                }
+                
+                for ai_result in ai_results:
+                    scene = ai_result.story_arc.scene_classification
+                    tone = ai_result.story_arc.emotional_tone
+                    position = ai_result.story_arc.narrative_position
+                    
+                    story_breakdown["scenes"][scene] = story_breakdown["scenes"].get(scene, 0) + 1
+                    story_breakdown["tones"][tone] = story_breakdown["tones"].get(tone, 0) + 1
+                    story_breakdown["positions"][position] = story_breakdown["positions"].get(position, 0) + 1
+                
+                # Calculate quality metrics
+                scores = []
+                story_importances = []
+                for ai_result in ai_results:
+                    scores.append(ai_result.final_score)
+                    story_importances.append(ai_result.story_arc.story_importance)
+                
+                quality_metrics = {
+                    "average_score": sum(scores) / len(scores) if scores else 0,
+                    "max_score": max(scores) if scores else 0,
+                    "min_score": min(scores) if scores else 0,
+                    "high_quality_clips": len([s for s in scores if s > 0.7]),
+                    "story_importance_avg": sum(story_importances) / len(story_importances) if story_importances else 0
+                }
+                
+            except Exception as e:
+                print(f"⚠️ AI analysis failed: {e}")
+                import traceback
+                traceback.print_exc()
+                # Continue without AI analysis
+        
+        return AISelectionResponse(
+            ok=True,
+            proxy_output=result.get("proxy_output"),
+            timeline_path=result.get("timeline_path"),
+            timeline_hash=result.get("timeline_hash"),
+            proxy_time=result.get("proxy_time"),
+            render_time=result.get("render_time"),
+            total_time=result.get("total_time"),
+            selected_clips=selected_clips,
+            story_breakdown=story_breakdown,
+            quality_metrics=quality_metrics
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_msg = f"AI autocut error: {str(e)}"
+        print(f"❌ AI autocut exception: {type(e).__name__}: {e}")
+        print(f"❌ Exception details: {repr(e)}")
+        import traceback
+        traceback.print_exc()
+        return AISelectionResponse(ok=False, error=error_msg)
+
 
 @app.get("/health")
 async def health_check():
@@ -434,6 +701,250 @@ async def health_check():
 async def ping():
     """Simple ping endpoint for connection testing"""
     return {"message": "pong", "timestamp": time.time()}
+
+@app.post("/clear_cache")
+async def clear_cache():
+    """Clear AI analysis cache to force fresh analysis"""
+    try:
+        background_processor.clear_ai_cache()
+        return {"ok": True, "message": "Cache cleared successfully"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+# Background Processing Endpoints
+@app.post("/preview/start", response_model=BackgroundJobResponse)
+async def preview_start(request: AutoCutRequest):
+    """Compatibility preview start endpoint mapping to background job system."""
+    try:
+        if not request.clips:
+            raise HTTPException(status_code=400, detail="No clips provided")
+        if not os.path.exists(request.music):
+            raise HTTPException(status_code=400, detail=f"Music file not found: {request.music}")
+
+        for clip_path in request.clips:
+            if not os.path.exists(clip_path):
+                raise HTTPException(status_code=400, detail=f"Clip file not found: {clip_path}")
+
+        job_id = background_processor.create_job(
+            clips=request.clips,
+            music_path=request.music,
+            target_duration=request.target_seconds,
+            story_style=request.story_style or 'traditional',
+            style_preset=request.style_preset or 'romantic'
+        )
+        asyncio.create_task(background_processor.start_processing(job_id))
+        return BackgroundJobResponse(ok=True, job_id=job_id)
+    except HTTPException:
+        raise
+    except Exception as e:
+        return BackgroundJobResponse(ok=False, error=str(e))
+
+@app.get("/preview/status/{job_id}", response_model=JobStatusResponse)
+async def preview_status(job_id: str):
+    job = background_processor.get_job_status(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    results_dict = None
+    if job.results:
+        results_dict = [
+            {
+                "clip_path": r.clip_path,
+                "final_score": r.final_score,
+                "selection_reason": r.selection_reason,
+                "description": r.description,
+                "object_analysis": {
+                    "key_moments": r.object_analysis.key_moments,
+                    "scene_classification": r.object_analysis.scene_classification,
+                    "objects_detected": r.object_analysis.objects_detected,
+                },
+                "story_arc": {
+                    "scene_classification": r.story_arc.scene_classification,
+                    "emotional_tone": r.story_arc.emotional_tone,
+                    "story_importance": r.story_arc.story_importance,
+                },
+            }
+            for r in job.results
+        ]
+    return JobStatusResponse(
+        ok=True,
+        job_id=job.job_id,
+        status=job.status.value,
+        progress=job.progress,
+        current_step=job.current_step,
+        results=results_dict,
+        error=job.error,
+        created_at=job.created_at,
+        started_at=job.started_at,
+        completed_at=job.completed_at,
+    )
+
+@app.get("/preview/result/{job_id}")
+async def preview_result(job_id: str):
+    results = background_processor.get_job_results(job_id)
+    if results is None:
+        raise HTTPException(status_code=404, detail="Job not found or not completed")
+
+    selected_clips = [
+        {
+            "path": r.clip_path,
+            "score": r.final_score,
+            "scene": r.story_arc.scene_classification,
+            "tone": r.story_arc.emotional_tone,
+            "importance": r.story_arc.story_importance,
+            "reason": r.selection_reason,
+            "description": r.description,
+            "object_analysis": {
+                "key_moments": r.object_analysis.key_moments,
+                "scene_classification": r.object_analysis.scene_classification,
+                "objects_detected": r.object_analysis.objects_detected,
+            },
+            "story_arc": {
+                "scene_classification": r.story_arc.scene_classification,
+                "emotional_tone": r.story_arc.emotional_tone,
+                "story_importance": r.story_arc.story_importance,
+            },
+        }
+        for r in results
+    ]
+
+    # Minimal preview shape expected by UI
+    preview = {
+        "selected_clips": selected_clips,
+        "timeline": [],  # UI will fall back to selected_clips mapping
+        "music_analysis": {},
+        "story_arc": {
+            "total_clips": len(selected_clips),
+            "story_flow": [c["scene"] for c in selected_clips],
+            "emotional_journey": [c["tone"] for c in selected_clips],
+            "key_moments": [],
+        },
+        "total_duration": 0,
+        "target_duration": 0,
+    }
+    return {"ok": True, "preview": preview}
+@app.post("/background/start", response_model=BackgroundJobResponse)
+async def start_background_job(request: BackgroundJobRequest):
+    """Start a background AI processing job"""
+    try:
+        # Validate inputs
+        if not request.clips:
+            raise HTTPException(status_code=400, detail="No clips provided")
+        
+        if not os.path.exists(request.music_path):
+            raise HTTPException(status_code=400, detail=f"Music file not found: {request.music_path}")
+        
+        # Validate clip files
+        for clip_path in request.clips:
+            if not os.path.exists(clip_path):
+                raise HTTPException(status_code=400, detail=f"Clip file not found: {clip_path}")
+        
+        # Create background job
+        job_id = background_processor.create_job(
+            clips=request.clips,
+            music_path=request.music_path,
+            target_duration=request.target_duration,
+            story_style=request.story_style,
+            style_preset=request.style_preset
+        )
+        
+        # Start processing in background
+        asyncio.create_task(background_processor.start_processing(job_id))
+        
+        print(f"INFO:main:🚀 Started background job {job_id} for {len(request.clips)} clips")
+        
+        return BackgroundJobResponse(ok=True, job_id=job_id)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        error_msg = f"Failed to start background job: {str(e)}"
+        print(f"❌ Background job error: {error_msg}")
+        return BackgroundJobResponse(ok=False, error=error_msg)
+
+@app.get("/background/status/{job_id}", response_model=JobStatusResponse)
+async def get_job_status(job_id: str):
+    """Get the status of a background job"""
+    job = background_processor.get_job_status(job_id)
+    
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    # Convert results to dict format if available
+    results_dict = None
+    if job.results:
+        results_dict = [
+            {
+                "clip_path": result.clip_path,
+                "final_score": result.final_score,
+                "selection_reason": result.selection_reason,
+                "story_arc": {
+                    "scene_classification": result.story_arc.scene_classification,
+                    "emotional_tone": result.story_arc.emotional_tone,
+                    "story_importance": result.story_arc.story_importance
+                }
+            }
+            for result in job.results
+        ]
+    
+    return JobStatusResponse(
+        ok=True,
+        job_id=job.job_id,
+        status=job.status.value,
+        progress=job.progress,
+        current_step=job.current_step,
+        results=results_dict,
+        error=job.error,
+        created_at=job.created_at,
+        started_at=job.started_at,
+        completed_at=job.completed_at
+    )
+
+@app.post("/background/cancel/{job_id}")
+async def cancel_job(job_id: str):
+    """Cancel a running background job"""
+    success = background_processor.cancel_job(job_id)
+    
+    if not success:
+        raise HTTPException(status_code=404, detail="Job not found or cannot be cancelled")
+    
+    return {"ok": True, "message": f"Job {job_id} cancelled"}
+
+@app.get("/background/results/{job_id}")
+async def get_job_results(job_id: str):
+    """Get the results of a completed background job"""
+    results = background_processor.get_job_results(job_id)
+    
+    if results is None:
+        raise HTTPException(status_code=404, detail="Job not found or not completed")
+    
+    # Convert results to dict format
+    results_dict = [
+        {
+            "clip_path": result.clip_path,
+            "final_score": result.final_score,
+            "selection_reason": result.selection_reason,
+            "object_analysis": {
+                "key_moments": result.object_analysis.key_moments,
+                "scene_classification": result.object_analysis.scene_classification,
+                "objects_detected": result.object_analysis.objects_detected
+            },
+            "story_arc": {
+                "scene_classification": result.story_arc.scene_classification,
+                "emotional_tone": result.story_arc.emotional_tone,
+                "story_importance": result.story_arc.story_importance
+            }
+        }
+        for result in results
+    ]
+    
+    return {"ok": True, "results": results_dict}
+
+@app.post("/background/cleanup")
+async def cleanup_old_jobs():
+    """Clean up old completed jobs"""
+    cleaned_count = background_processor.cleanup_old_jobs()
+    return {"ok": True, "cleaned_jobs": cleaned_count}
 
 if __name__ == "__main__":
     import uvicorn

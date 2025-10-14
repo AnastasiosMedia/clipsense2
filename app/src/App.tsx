@@ -4,6 +4,7 @@ import { ProcessingStatus } from './components/ProcessingStatus';
 import { ResultDisplay } from './components/ResultDisplay';
 import { ToastContainer, ToastData } from './components/ToastContainer';
 import { ApiService } from './services/api';
+import StoryboardPreview from './components/StoryboardPreview';
 import { FileSelection, ProcessingState, HealthResponse } from './types';
 import { invoke } from '@tauri-apps/api/tauri';
 import config from './config';
@@ -30,6 +31,7 @@ function App() {
     render_time?: number;
     total_time?: number;
   }>({});
+  const [showPreview, setShowPreview] = useState(false);
 
   // Check backend connection on mount
   useEffect(() => {
@@ -122,7 +124,8 @@ function App() {
       const response = await ApiService.autoCut({
         clips: fileSelection.clips,
         music: fileSelection.music,
-        target_seconds: 60
+        target_seconds: 60,
+        use_ai_selection: false  // Use regular processing for now
       });
 
       clearInterval(progressInterval);
@@ -241,6 +244,13 @@ function App() {
               <p className="text-sm text-gray-400 mt-2">
                 Creates a 60-second highlight video with music overlay
               </p>
+              <button
+                onClick={() => setShowPreview(true)}
+                disabled={!canProcess}
+                className="btn-secondary w-full text-lg py-3 mt-3"
+              >
+                Preview Storyboard
+              </button>
             </div>
 
             {/* Processing Status */}
@@ -268,6 +278,100 @@ function App() {
         </div>
       </div>
       
+      {/* Preview Modal */}
+      {showPreview && (
+        <StoryboardPreview
+          fileSelection={fileSelection}
+          qualitySettings={{}}
+          onClose={() => setShowPreview(false)}
+          onGenerate={async (request) => {
+            console.log('Generated with request:', request);
+            setShowPreview(false);
+            
+            // Start AI processing
+            setProcessingState({
+              isProcessing: true,
+              progress: 0,
+              currentStep: 'Starting AI processing...',
+              error: null
+            });
+
+            setOutputPath(null);
+            setProcessingMetrics({});
+            addToast('Starting AI-powered video processing...', 'info');
+
+            try {
+              // Simulate progress updates
+              const progressInterval = setInterval(() => {
+                setProcessingState(prev => {
+                  const newProgress = Math.min(prev.progress + 8, 90);
+                  let step = '';
+                  if (newProgress < 30) step = 'Analyzing content with AI...';
+                  else if (newProgress < 60) step = 'Selecting best clips...';
+                  else if (newProgress < 90) step = 'Generating storyboard...';
+                  else step = 'Finalizing output...';
+                  
+                  return {
+                    ...prev,
+                    progress: newProgress,
+                    currentStep: step
+                  };
+                });
+              }, 1000);
+
+              const response = await ApiService.aiAutoCut({
+                clips: request.clips,
+                music_path: request.music_path,
+                target_duration: request.target_duration,
+                story_style: request.story_style,
+                style_preset: request.style_preset,
+                use_ai_selection: request.use_ai_selection
+              });
+
+              clearInterval(progressInterval);
+
+              if (response.ok && response.proxy_output) {
+                setProcessingState({
+                  isProcessing: false,
+                  progress: 100,
+                  currentStep: 'Complete!',
+                  error: null
+                });
+                setOutputPath(response.proxy_output);
+                setProcessingMetrics({
+                  proxy_time: response.proxy_time,
+                  render_time: response.render_time,
+                  total_time: response.total_time,
+                  selected_clips: response.selected_clips,
+                  story_breakdown: response.story_breakdown,
+                  quality_metrics: response.quality_metrics
+                });
+                addToast('AI-powered video processing completed successfully!', 'success');
+              } else {
+                const errorMsg = response.error || 'Unknown error occurred';
+                setProcessingState({
+                  isProcessing: false,
+                  progress: 0,
+                  currentStep: '',
+                  error: errorMsg
+                });
+                addToast(`AI processing failed: ${errorMsg}`, 'error', 10000);
+              }
+            } catch (error) {
+              clearInterval(progressInterval);
+              const errorMsg = error instanceof Error ? error.message : 'AI processing failed';
+              setProcessingState({
+                isProcessing: false,
+                progress: 0,
+                currentStep: '',
+                error: errorMsg
+              });
+              addToast(`AI processing failed: ${errorMsg}`, 'error', 10000);
+            }
+          }}
+        />
+      )}
+
       {/* Toast Notifications */}
       <ToastContainer toasts={toasts} onRemoveToast={removeToast} />
     </div>

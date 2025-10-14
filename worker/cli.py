@@ -13,8 +13,14 @@ from pathlib import Path
 # Add current directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from conform import ConformProcessor
-from timeline import read_timeline, validate_timeline_sources
+try:
+    from .conform import ConformProcessor
+except ImportError:
+    from conform import ConformProcessor
+try:
+    from .timeline import read_timeline, validate_timeline_sources
+except ImportError:
+    from timeline import read_timeline, validate_timeline_sources
 
 
 async def main():

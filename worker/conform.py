@@ -11,8 +11,14 @@ import subprocess
 import asyncio
 from pathlib import Path
 from typing import List, Dict, Any, Optional
-from video_processor import VideoProcessor
-from timeline import read_timeline, validate_timeline_sources
+try:
+    from .video_processor import VideoProcessor
+except ImportError:
+    from video_processor import VideoProcessor
+try:
+    from .timeline import read_timeline, validate_timeline_sources
+except ImportError:
+    from timeline import read_timeline, validate_timeline_sources
 
 
 class ConformProcessor:
