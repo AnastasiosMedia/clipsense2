@@ -284,8 +284,12 @@ const StoryboardPreview: React.FC<StoryboardPreviewProps> = ({
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-[#1a1a1a]">
           <div className="flex items-center">
-            <div className="w-10 h-10 bg-[#0f0f0f] rounded-xl flex items-center justify-center mr-4 border border-[#1a1a1a]">
-              <div className="w-6 h-6 bg-[#1a1a1a] rounded"></div>
+            <div className="w-20 h-20 rounded-xl flex items-center justify-center mr-4 overflow-hidden">
+              <img 
+                src="/cs01.png" 
+                alt="ClipSense Logo" 
+                className="w-full h-full object-cover rounded-lg"
+              />
             </div>
             <div>
               <h2 className="text-2xl font-bold text-white">Storyboard Preview</h2>

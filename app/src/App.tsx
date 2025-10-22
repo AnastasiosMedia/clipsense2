@@ -194,8 +194,16 @@ function App() {
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
+          {/* Logo */}
+          <div className="flex justify-center mb-4">
+            <img 
+              src="/cs01.png" 
+              alt="ClipSense Logo" 
+              className="h-32 w-auto rounded-lg shadow-lg"
+            />
+          </div>
           <h1 className="text-4xl font-bold text-white mb-2">ClipSense</h1>
-          <p className="text-gray-400">Create highlight videos with music overlay</p>
+          <p className="text-gray-400">Upload. Analyze. Create</p>
           
           {/* Backend Status */}
           <div className="mt-4">
