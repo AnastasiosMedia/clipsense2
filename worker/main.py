@@ -152,8 +152,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount static files for thumbnails
+# Mount static files for thumbnails and videos
 app.mount("/thumbnails", StaticFiles(directory=THUMBNAIL_DIR), name="thumbnails")
+
+# Serve video files from export directory
+EXPORT_DIR = "/Users/anastasiosk/Documents/devprojects/OS/clipsense2/tests/testwedding/Export"
+app.mount("/videos", StaticFiles(directory=EXPORT_DIR), name="videos")
 
 # Initialize video processor
 video_processor = VideoProcessor()
@@ -171,8 +175,8 @@ class AutoCutRequest(BaseModel):
 class AutoCutResponse(BaseModel):
     """Response model for auto-cut processing"""
     ok: bool
+    output: Optional[str] = None  # Changed from export_output to match frontend
     proxy_output: Optional[str] = None
-    export_output: Optional[str] = None  # New: Export path
     timeline_path: Optional[str] = None
     timeline_hash: Optional[str] = None
     error: Optional[str] = None
@@ -320,6 +324,12 @@ async def auto_cut(request: AutoCutRequest):
     """
     start_time = time.time()
     
+    print(f"🎬 AutoCut request received:")
+    print(f"  - Clips: {request.clips}")
+    print(f"  - Music: {request.music}")
+    print(f"  - Target duration: {request.target_seconds}s")
+    print(f"  - Use AI selection: {getattr(request, 'use_ai_selection', 'Not provided')}")
+    
     # Check FFmpeg availability first
     if not ffmpeg_available:
         return AutoCutResponse(
@@ -351,16 +361,22 @@ async def auto_cut(request: AutoCutRequest):
         
         total_time = time.time() - start_time
         
-        return AutoCutResponse(
+        response = AutoCutResponse(
             ok=True,
-            proxy_output=result["proxy_output"],
-            export_output=result.get("export_output"),  # New: Export path
-            timeline_path=result["timeline_path"],
-            timeline_hash=result["timeline_hash"],
+            output=result.get("export_output"),  # Map export_output to output field
             proxy_time=result.get("proxy_time"),
             render_time=result.get("render_time"),
             total_time=total_time
         )
+        
+        print(f"🎬 AutoCut response:")
+        print(f"  - ok: {response.ok}")
+        print(f"  - output: {response.output}")
+        print(f"  - proxy_time: {response.proxy_time}")
+        print(f"  - render_time: {response.render_time}")
+        print(f"  - total_time: {response.total_time}")
+        
+        return response
         
     except subprocess.CalledProcessError as e:
         stderr_text = e.stderr if isinstance(e.stderr, str) else e.stderr.decode() if e.stderr else str(e)

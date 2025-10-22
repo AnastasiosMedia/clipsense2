@@ -70,6 +70,7 @@ const StoryboardPreview: React.FC<StoryboardPreviewProps> = ({
     }
 
     setIsLoading(true);
+    setIsGeneratingPreview(true);
     setError(null);
 
     try {
@@ -111,8 +112,9 @@ const StoryboardPreview: React.FC<StoryboardPreviewProps> = ({
         const status = await ApiService.previewStatus(jobId);
         console.log('🧪 Preview status ←', status);
           if (status.status === 'completed') {
-          const res = await ApiService.previewResult(jobId);
-          console.log('🧪 Preview result ←', res);
+          try {
+            const res = await ApiService.previewResult(jobId);
+            console.log('🧪 Preview result ←', res);
           if (res && (res as any).ok) {
             const preview = (res as any).preview;
             const results = (res as any).results;
@@ -139,6 +141,10 @@ const StoryboardPreview: React.FC<StoryboardPreviewProps> = ({
           } else {
             setError('Failed to get preview result');
           }
+          } catch (resultError) {
+            console.error('❌ Preview result error:', resultError);
+            setError(`Failed to load preview result: ${resultError instanceof Error ? resultError.message : 'Unknown error'}`);
+          }
           return;
         }
         if (status.status === 'failed') {
@@ -153,37 +159,32 @@ const StoryboardPreview: React.FC<StoryboardPreviewProps> = ({
       setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setIsLoading(false);
+      setIsGeneratingPreview(false);
     }
   };
 
   const handleGenerate = () => {
     if (!fileSelection.music) return;
 
-    // Start fade out animation
-    setShowModalContent(false);
+    // Immediately start generating preview
+    setIsGeneratingPreview(true);
     
-    // Wait for fade out to complete
+    // Simulate generation time (you can replace this with actual API call)
     setTimeout(() => {
-      setIsGeneratingPreview(true);
+      setIsGeneratingPreview(false);
       
-      // Simulate generation time (you can replace this with actual API call)
-      setTimeout(() => {
-        setIsGeneratingPreview(false);
-        
-        const request: AutoCutRequest = {
-          clips: fileSelection.clips,
-          music: fileSelection.music,
-          target_seconds: fileSelection.clips.length > 20 ? 120 : 60,
-          quality_settings: qualitySettings,
-          story_style: selectedStoryStyle,
-          style_preset: selectedStylePreset,
-          use_ai_selection: useAISelection
-        };
+      const request: AutoCutRequest = {
+        clips: fileSelection.clips,
+        music: fileSelection.music,
+        target_seconds: fileSelection.clips.length > 20 ? 120 : 60,
+        quality_settings: qualitySettings,
+        story_style: selectedStoryStyle,
+        style_preset: selectedStylePreset,
+        use_ai_selection: useAISelection
+      };
 
-        onGenerate(request);
-        setShowModalContent(true);
-      }, 2000); // 2 seconds for demo
-    }, 300); // 300ms fade out duration
+      onGenerate(request);
+    }, 2000); // 2 seconds for demo
   };
 
   const formatTime = (seconds: number) => {
@@ -295,12 +296,12 @@ const StoryboardPreview: React.FC<StoryboardPreviewProps> = ({
             ×
           </button>
           </div>
-        </div>
 
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)] scrollable">
-          {/* Ensure a single root inside scroll area to avoid adjacent JSX parse issues */}
-          <div>
-          {/* AI Selection Options - Always visible */}
+          <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)] scrollable">
+            {/* Ensure a single root inside scroll area to avoid adjacent JSX parse issues */}
+            <div>
+            {/* AI Selection Options - Hide during generation */}
+            {!isGeneratingPreview && (
           <div className="max-w-2xl mx-auto mb-8 space-y-6">
             <div className="text-center mb-6">
               <h3 className="text-xl font-semibold text-white mb-2">AI-Powered Content Selection</h3>
@@ -397,10 +398,11 @@ const StoryboardPreview: React.FC<StoryboardPreviewProps> = ({
                   )}
                 </button>
               </div>
-          </div>
+            </div>
+            )}
 
-          {/* Preview Data Display */}
-          {previewData && (
+            {/* Preview Data Display - Hide during generation */}
+            {previewData && !isGeneratingPreview && (
             <div className="space-y-8">
               {/* Overview */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -635,7 +637,8 @@ const StoryboardPreview: React.FC<StoryboardPreviewProps> = ({
                 <button onClick={handleGenerate} className="btn-primary px-8 py-3">Generate Video</button>
               </div>
             </div>
-          )}
+            )}
+            </div>
           </div>
         </div>
 

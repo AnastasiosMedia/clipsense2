@@ -3,6 +3,7 @@ import { FilePicker } from './components/FilePicker';
 import { ProcessingStatus } from './components/ProcessingStatus';
 import { ResultDisplay } from './components/ResultDisplay';
 import { ToastContainer, ToastData } from './components/ToastContainer';
+import { VideoPreviewModal } from './components/VideoPreviewModal';
 import { ApiService } from './services/api';
 import StoryboardPreview from './components/StoryboardPreview';
 import { FileSelection, ProcessingState } from './types';
@@ -25,6 +26,7 @@ function App() {
   const [outputPath, setOutputPath] = useState<string | null>(null);
   const [backendStatus, setBackendStatus] = useState<'checking' | 'connected' | 'error'>('checking');
   const [toasts, setToasts] = useState<ToastData[]>([]);
+  const [hasShownBackendNotification, setHasShownBackendNotification] = useState(false);
   const [processingMetrics, setProcessingMetrics] = useState<{
     proxy_time?: number;
     render_time?: number;
@@ -34,6 +36,7 @@ function App() {
     quality_metrics?: any;
   }>({});
   const [showPreview, setShowPreview] = useState(false);
+  const [showVideoPreview, setShowVideoPreview] = useState(false);
 
   // Check backend connection on mount
   useEffect(() => {
@@ -59,10 +62,16 @@ function App() {
       
       if (health.ffmpeg_available) {
         setBackendStatus('connected');
-        addToast('Backend connected and FFmpeg ready!', 'success');
+        if (!hasShownBackendNotification) {
+          addToast('Backend connected and FFmpeg ready!', 'success');
+          setHasShownBackendNotification(true);
+        }
       } else {
         setBackendStatus('error');
-        addToast('Backend connected but FFmpeg not found', 'error', 10000);
+        if (!hasShownBackendNotification) {
+          addToast('Backend connected but FFmpeg not found', 'error', 10000);
+          setHasShownBackendNotification(true);
+        }
       }
       
       if (config.get('enableDebugLogs')) {
@@ -71,7 +80,10 @@ function App() {
     } catch (error) {
       setBackendStatus('error');
       console.error('Backend connection failed:', error);
-      addToast('Cannot connect to backend. Make sure the worker is running.', 'error', 10000);
+      if (!hasShownBackendNotification) {
+        addToast('Cannot connect to backend. Make sure the worker is running.', 'error', 10000);
+        setHasShownBackendNotification(true);
+      }
     }
   };
 
@@ -102,35 +114,24 @@ function App() {
     setProcessingMetrics({});
     addToast('Starting video processing...', 'info');
 
-    let progressInterval: ReturnType<typeof setInterval> | undefined;
     try {
-      // Simulate progress updates
-      progressInterval = setInterval(() => {
-        setProcessingState(prev => {
-          const newProgress = Math.min(prev.progress + 10, 90);
-          let step = '';
-          
-          if (newProgress < 30) step = 'Creating video proxies...';
-          else if (newProgress < 60) step = 'Trimming segments...';
-          else if (newProgress < 80) step = 'Concatenating clips...';
-          else step = 'Overlaying music and finalizing...';
-          
-          return {
-            ...prev,
-            progress: newProgress,
-            currentStep: step
-          };
-        });
-      }, 1000);
+      // Set initial processing state
+      setProcessingState({
+        isProcessing: true,
+        progress: 0,
+        currentStep: 'Starting video processing...',
+        error: null
+      });
 
+      console.log('🎬 Sending AutoCut request with clips:', fileSelection.clips);
+      console.log('🎬 Music file:', fileSelection.music);
+      
       const response = await ApiService.autoCut({
         clips: fileSelection.clips,
         music: fileSelection.music,
         target_seconds: 60,
         use_ai_selection: false  // Use regular processing for now
       });
-
-      if (progressInterval) clearInterval(progressInterval);
 
       if (response.ok && response.output) {
         setProcessingState({
@@ -146,6 +147,8 @@ function App() {
           total_time: response.total_time
         });
         addToast('Video processing completed successfully!', 'success');
+        // Show video preview modal
+        setShowVideoPreview(true);
       } else {
         const errorMsg = response.error || 'Unknown error occurred';
         setProcessingState({
@@ -157,7 +160,6 @@ function App() {
         addToast(`Processing failed: ${errorMsg}`, 'error', 10000);
       }
     } catch (error) {
-      if (progressInterval) clearInterval(progressInterval);
       const errorMsg = error instanceof Error ? error.message : 'Processing failed';
       setProcessingState({
         isProcessing: false,
@@ -250,7 +252,7 @@ function App() {
               <button
                 onClick={() => setShowPreview(true)}
                 disabled={!canProcess}
-                className="btn-secondary w-full text-lg py-3 mt-3"
+                className="btn-yellow w-full text-lg py-3 mt-3"
               >
                 Preview Storyboard
               </button>
@@ -263,6 +265,7 @@ function App() {
             <ResultDisplay 
               outputPath={outputPath} 
               onOpenFile={handleOpenFile}
+              onOpenPreview={() => setShowVideoPreview(true)}
               metrics={processingMetrics}
             />
           </div>
@@ -292,25 +295,14 @@ function App() {
             setProcessingMetrics({});
             addToast('Starting AI-powered video processing...', 'info');
 
-            let progressInterval: ReturnType<typeof setInterval> | undefined;
             try {
-              // Simulate progress updates
-              progressInterval = setInterval(() => {
-                setProcessingState(prev => {
-                  const newProgress = Math.min(prev.progress + 8, 90);
-                  let step = '';
-                  if (newProgress < 30) step = 'Analyzing content with AI...';
-                  else if (newProgress < 60) step = 'Selecting best clips...';
-                  else if (newProgress < 90) step = 'Generating storyboard...';
-                  else step = 'Finalizing output...';
-                  
-                  return {
-                    ...prev,
-                    progress: newProgress,
-                    currentStep: step
-                  };
-                });
-              }, 1000);
+              // Set initial processing state
+              setProcessingState({
+                isProcessing: true,
+                progress: 0,
+                currentStep: 'Starting AI-powered video processing...',
+                error: null
+              });
 
               const response = await ApiService.aiAutoCut({
                 clips: request.clips,
@@ -320,8 +312,6 @@ function App() {
                 style_preset: request.style_preset || 'balanced',
                 use_ai_selection: request.use_ai_selection === true
               });
-
-              if (progressInterval) clearInterval(progressInterval);
 
               if (response.ok && response.proxy_output) {
                 setProcessingState({
@@ -340,6 +330,8 @@ function App() {
                   quality_metrics: response.quality_metrics
                 });
                 addToast('AI-powered video processing completed successfully!', 'success');
+                // Show video preview modal
+                setShowVideoPreview(true);
               } else {
                 const errorMsg = response.error || 'Unknown error occurred';
                 setProcessingState({
@@ -351,7 +343,6 @@ function App() {
                 addToast(`AI processing failed: ${errorMsg}`, 'error', 10000);
               }
             } catch (error) {
-              if (progressInterval) clearInterval(progressInterval);
               const errorMsg = error instanceof Error ? error.message : 'AI processing failed';
               setProcessingState({
                 isProcessing: false,
@@ -362,6 +353,16 @@ function App() {
               addToast(`AI processing failed: ${errorMsg}`, 'error', 10000);
             }
           }}
+        />
+      )}
+
+      {/* Video Preview Modal */}
+      {outputPath && (
+        <VideoPreviewModal
+          isOpen={showVideoPreview}
+          onClose={() => setShowVideoPreview(false)}
+          videoPath={outputPath}
+          videoName="Highlight Video"
         />
       )}
 

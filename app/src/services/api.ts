@@ -20,6 +20,7 @@ export class ApiService {
     const timeoutId = setTimeout(() => controller.abort(), config.get('apiTimeout'));
     
     try {
+      console.log(`🚀 Starting request to ${url} with timeout ${config.get('apiTimeout')}ms`);
       const response = await fetch(url, {
         headers: {
           'Content-Type': 'application/json',
@@ -30,13 +31,16 @@ export class ApiService {
       });
 
       clearTimeout(timeoutId);
+      console.log(`📡 Response received: ${response.status} ${response.statusText}`);
 
       if (!response.ok) {
         const errorText = await response.text();
+        console.error(`❌ API request failed: ${response.status} ${errorText}`);
         throw new Error(`API request failed: ${response.status} ${errorText}`);
       }
 
       const data = await response.json();
+      console.log(`✅ Response data:`, data);
       
       if (config.get('enableDebugLogs')) {
         console.log(`✅ API Response: ${endpoint}`, data);
@@ -47,9 +51,11 @@ export class ApiService {
       clearTimeout(timeoutId);
       
       if (error instanceof Error && error.name === 'AbortError') {
+        console.error(`⏰ Request timeout after ${config.get('apiTimeout')}ms for ${url}`);
         throw new Error(`API request timed out after ${config.get('apiTimeout')}ms`);
       }
       
+      console.error(`❌ Request error for ${url}:`, error);
       throw error;
     }
   }
@@ -63,10 +69,23 @@ export class ApiService {
   }
 
   static async autoCut(request: AutoCutRequest): Promise<AutoCutResponse> {
-    return this.request<AutoCutResponse>('/autocut', {
-      method: 'POST',
-      body: JSON.stringify(request),
+    console.log('🎬 AutoCut request:', {
+      clips: request.clips,
+      music: request.music,
+      target_seconds: request.target_seconds
     });
+    
+    try {
+      const result = await this.request<AutoCutResponse>('/autocut', {
+        method: 'POST',
+        body: JSON.stringify(request),
+      });
+      console.log('✅ AutoCut response:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ AutoCut error:', error);
+      throw error;
+    }
   }
 
   static async aiAutoCut(request: AISelectionRequest): Promise<AISelectionResponse> {

@@ -47,6 +47,10 @@
     @apply border border-[#1a1a1a] text-[#666666] hover:border-[#333333] hover:text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
   }
   
+  .btn-yellow {
+    @apply border border-yellow-500 text-yellow-400 hover:border-yellow-400 hover:text-yellow-300 font-medium py-2 px-4 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  
   .card {
     @apply bg-[#0f0f0f] border border-[#1a1a1a] rounded-lg p-6;
   }

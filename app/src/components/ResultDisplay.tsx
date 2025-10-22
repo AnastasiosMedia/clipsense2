@@ -3,6 +3,7 @@ import React from 'react';
 interface ResultDisplayProps {
   outputPath: string | null;
   onOpenFile: (path: string) => void;
+  onOpenPreview?: () => void;
   metrics?: {
     proxy_time?: number;
     render_time?: number;
@@ -13,6 +14,7 @@ interface ResultDisplayProps {
 export const ResultDisplay: React.FC<ResultDisplayProps> = ({
   outputPath,
   onOpenFile,
+  onOpenPreview,
   metrics
 }) => {
   if (!outputPath) {
@@ -35,12 +37,22 @@ export const ResultDisplay: React.FC<ResultDisplayProps> = ({
           </p>
         </div>
         
-        <button
-          onClick={handleOpenFile}
-          className="btn-primary w-full"
-        >
-          Open File Location
-        </button>
+        <div className="flex space-x-3">
+          {onOpenPreview && (
+            <button
+              onClick={onOpenPreview}
+              className="btn-yellow flex-1"
+            >
+              Open Preview
+            </button>
+          )}
+          <button
+            onClick={handleOpenFile}
+            className="btn-primary flex-1"
+          >
+            Open File Location
+          </button>
+        </div>
         
         {/* Processing Metrics */}
         {metrics && (metrics.proxy_time || metrics.render_time || metrics.total_time) && (
