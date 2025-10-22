@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { FilePicker } from './components/FilePicker';
 import { ProcessingStatus } from './components/ProcessingStatus';
 import { ResultDisplay } from './components/ResultDisplay';
 import { ToastContainer, ToastData } from './components/ToastContainer';
 import { ApiService } from './services/api';
 import StoryboardPreview from './components/StoryboardPreview';
-import { FileSelection, ProcessingState, HealthResponse } from './types';
+import { FileSelection, ProcessingState } from './types';
 import { invoke } from '@tauri-apps/api/tauri';
 import config from './config';
 
@@ -24,12 +24,14 @@ function App() {
   
   const [outputPath, setOutputPath] = useState<string | null>(null);
   const [backendStatus, setBackendStatus] = useState<'checking' | 'connected' | 'error'>('checking');
-  const [healthData, setHealthData] = useState<HealthResponse | null>(null);
   const [toasts, setToasts] = useState<ToastData[]>([]);
   const [processingMetrics, setProcessingMetrics] = useState<{
     proxy_time?: number;
     render_time?: number;
     total_time?: number;
+    selected_clips?: any[];
+    story_breakdown?: any;
+    quality_metrics?: any;
   }>({});
   const [showPreview, setShowPreview] = useState(false);
 
@@ -54,7 +56,6 @@ function App() {
       
       // Then get detailed health info
       const health = await ApiService.healthCheck();
-      setHealthData(health);
       
       if (health.ffmpeg_available) {
         setBackendStatus('connected');
@@ -101,9 +102,10 @@ function App() {
     setProcessingMetrics({});
     addToast('Starting video processing...', 'info');
 
+    let progressInterval: ReturnType<typeof setInterval> | undefined;
     try {
       // Simulate progress updates
-      const progressInterval = setInterval(() => {
+      progressInterval = setInterval(() => {
         setProcessingState(prev => {
           const newProgress = Math.min(prev.progress + 10, 90);
           let step = '';
@@ -128,7 +130,7 @@ function App() {
         use_ai_selection: false  // Use regular processing for now
       });
 
-      clearInterval(progressInterval);
+      if (progressInterval) clearInterval(progressInterval);
 
       if (response.ok && response.output) {
         setProcessingState({
@@ -155,7 +157,7 @@ function App() {
         addToast(`Processing failed: ${errorMsg}`, 'error', 10000);
       }
     } catch (error) {
-      clearInterval(progressInterval);
+      if (progressInterval) clearInterval(progressInterval);
       const errorMsg = error instanceof Error ? error.message : 'Processing failed';
       setProcessingState({
         isProcessing: false,
@@ -300,9 +302,10 @@ function App() {
             setProcessingMetrics({});
             addToast('Starting AI-powered video processing...', 'info');
 
+            let progressInterval: ReturnType<typeof setInterval> | undefined;
             try {
               // Simulate progress updates
-              const progressInterval = setInterval(() => {
+              progressInterval = setInterval(() => {
                 setProcessingState(prev => {
                   const newProgress = Math.min(prev.progress + 8, 90);
                   let step = '';
@@ -321,14 +324,14 @@ function App() {
 
               const response = await ApiService.aiAutoCut({
                 clips: request.clips,
-                music_path: request.music_path,
-                target_duration: request.target_duration,
-                story_style: request.story_style,
-                style_preset: request.style_preset,
-                use_ai_selection: request.use_ai_selection
+                music_path: request.music,
+                target_duration: request.target_seconds,
+                story_style: request.story_style || 'traditional',
+                style_preset: request.style_preset || 'balanced',
+                use_ai_selection: request.use_ai_selection === true
               });
 
-              clearInterval(progressInterval);
+              if (progressInterval) clearInterval(progressInterval);
 
               if (response.ok && response.proxy_output) {
                 setProcessingState({
@@ -358,7 +361,7 @@ function App() {
                 addToast(`AI processing failed: ${errorMsg}`, 'error', 10000);
               }
             } catch (error) {
-              clearInterval(progressInterval);
+              if (progressInterval) clearInterval(progressInterval);
               const errorMsg = error instanceof Error ? error.message : 'AI processing failed';
               setProcessingState({
                 isProcessing: false,

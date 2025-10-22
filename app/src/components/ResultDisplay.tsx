@@ -1,5 +1,4 @@
 import React from 'react';
-import { invoke } from '@tauri-apps/api/tauri';
 
 interface ResultDisplayProps {
   outputPath: string | null;

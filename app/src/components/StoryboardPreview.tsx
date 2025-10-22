@@ -174,6 +174,7 @@ const StoryboardPreview: React.FC<StoryboardPreviewProps> = ({
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // @ts-expect-error helper retained for future use
   const getEmotionColor = (emotion: string) => {
     const colors: { [key: string]: string } = {
       'joy': 'text-yellow-400',
@@ -217,6 +218,7 @@ const StoryboardPreview: React.FC<StoryboardPreviewProps> = ({
     }
   };
 
+  // @ts-expect-error helper retained for future use
   const getSceneFromSources = (clip: any) => {
     return (
       clip?.ai_analysis?.story_arc?.scene_classification ||
@@ -226,6 +228,7 @@ const StoryboardPreview: React.FC<StoryboardPreviewProps> = ({
     );
   };
 
+  // @ts-expect-error helper retained for future use
   const getEmotionFromSources = (clip: any) => {
     return (
       clip?.ai_analysis?.emotion_analysis?.overall_sentiment ||
@@ -234,11 +237,13 @@ const StoryboardPreview: React.FC<StoryboardPreviewProps> = ({
     );
   };
 
+  // @ts-expect-error helper retained for future use
   const getScoreFromSources = (clip: any) => {
     const s = clip?.ai_analysis?.overall_score ?? findSelectedClipInfo(clip.clip_name)?.score;
     return typeof s === 'number' ? `${Math.round(s * 100)}%` : '—';
   };
 
+  // @ts-expect-error helper retained for future use
   const getObjectsFromSources = (clip: any) => {
     try {
       const objs = clip?.ai_analysis?.object_analysis?.objects_detected || {};
@@ -351,7 +356,6 @@ const StoryboardPreview: React.FC<StoryboardPreviewProps> = ({
                     </div>
                   </>
                 )}
-              </div>
 
               {error && (
                 <div className="bg-red-900/20 border border-red-500/30 rounded-xl p-4 mb-6 max-w-md mx-auto">

@@ -3,6 +3,17 @@
  * Handles environment variables and API settings
  */
 
+// Type definitions for Vite environment variables (ambient via declaration merging)
+declare global {
+  interface ImportMetaEnv {
+    readonly VITE_API_BASE_URL?: string;
+    readonly VITE_API_TIMEOUT?: string;
+    readonly VITE_ENABLE_DEBUG_LOGS?: string;
+  }
+}
+
+// Use Vite's ImportMeta type contextually without redeclaration
+
 export interface AppConfig {
   apiBaseUrl: string;
   apiTimeout: number;
@@ -15,9 +26,9 @@ class Config {
 
   private constructor() {
     this.config = {
-      apiBaseUrl: import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8123',
-      apiTimeout: parseInt(import.meta.env.VITE_API_TIMEOUT || '300000'),
-      enableDebugLogs: import.meta.env.VITE_ENABLE_DEBUG_LOGS === 'true'
+      apiBaseUrl: (import.meta as any).env?.VITE_API_BASE_URL || 'http://127.0.0.1:8123',
+      apiTimeout: parseInt((import.meta as any).env?.VITE_API_TIMEOUT || '300000'),
+      enableDebugLogs: ((import.meta as any).env?.VITE_ENABLE_DEBUG_LOGS) === 'true'
     };
   }
 
