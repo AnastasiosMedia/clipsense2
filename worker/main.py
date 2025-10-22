@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import List, Optional, Dict, Any
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 try:
     # Try relative imports first (when run as module)
@@ -46,6 +47,10 @@ ffmpeg_path = None
 ffprobe_path = None
 ffmpeg_version = None
 
+# Thumbnail directory
+THUMBNAIL_DIR = "/tmp/clipsense_thumbnails"
+os.makedirs(THUMBNAIL_DIR, exist_ok=True)
+
 def check_port_availability(host: str, port: int) -> bool:
     """Check if a port is available"""
     try:
@@ -55,6 +60,48 @@ def check_port_availability(host: str, port: int) -> bool:
             return result != 0
     except Exception:
         return False
+
+async def generate_thumbnail(video_path: str) -> Optional[str]:
+    """Generate a thumbnail for a video clip and return the URL path"""
+    try:
+        # Create a unique filename based on the video path
+        import hashlib
+        video_hash = hashlib.md5(video_path.encode()).hexdigest()[:8]
+        thumbnail_filename = f"thumb_{video_hash}.jpg"
+        thumbnail_path = os.path.join(THUMBNAIL_DIR, thumbnail_filename)
+        
+        # Check if thumbnail already exists
+        if os.path.exists(thumbnail_path):
+            return f"/thumbnails/{thumbnail_filename}"
+        
+        # Generate thumbnail using ffmpeg
+        cmd = [
+            "ffmpeg", "-y",
+            "-ss", "0",  # Start at beginning
+            "-i", video_path,
+            "-frames:v", "1",  # Extract 1 frame
+            "-q:v", "2",  # High quality
+            "-vf", "scale=320:180",  # Resize to thumbnail size
+            thumbnail_path
+        ]
+        
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+        
+        stdout, stderr = await process.communicate()
+        
+        if process.returncode == 0 and os.path.exists(thumbnail_path):
+            return f"/thumbnails/{thumbnail_filename}"
+        else:
+            print(f"Thumbnail generation failed for {video_path}: {stderr.decode()}")
+            return None
+            
+    except Exception as e:
+        print(f"Error generating thumbnail for {video_path}: {e}")
+        return None
 
 def find_available_port(start_port: int, max_retries: int = 3) -> Optional[int]:
     """Find an available port starting from start_port"""
@@ -104,6 +151,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount static files for thumbnails
+app.mount("/thumbnails", StaticFiles(directory=THUMBNAIL_DIR), name="thumbnails")
 
 # Initialize video processor
 video_processor = VideoProcessor()
@@ -603,6 +653,9 @@ async def ai_autocut_endpoint(request: AISelectionRequest):
                     print(f"🔍 Description: {repr(ai_result.description)}")
                     print(f"🔍 Has description attr: {hasattr(ai_result, 'description')}")
                     
+                    # Generate thumbnail for this clip
+                    thumbnail_path = await generate_thumbnail(ai_result.clip_path)
+                    
                     selected_clips.append({
                         "path": ai_result.clip_path,
                         "score": ai_result.final_score,
@@ -611,6 +664,7 @@ async def ai_autocut_endpoint(request: AISelectionRequest):
                         "importance": ai_result.story_arc.story_importance,
                         "reason": ai_result.selection_reason,
                         "description": ai_result.description if hasattr(ai_result, 'description') and ai_result.description else "Description not available",
+                        "thumbnail_path": thumbnail_path,
                         "object_analysis": {
                             "key_moments": ai_result.object_analysis.key_moments,
                             "scene_classification": ai_result.object_analysis.scene_classification,
@@ -703,13 +757,16 @@ async def ping():
     return {"message": "pong", "timestamp": time.time()}
 
 @app.post("/clear_cache")
-async def clear_cache():
-    """Clear AI analysis cache to force fresh analysis"""
+async def clear_analysis_cache():
+    """Clear the AI analysis cache to force fresh analysis"""
     try:
-        background_processor.clear_ai_cache()
-        return {"ok": True, "message": "Cache cleared successfully"}
+        if 'ai_selector' in globals():
+            ai_selector.clear_cache()
+            return {"status": "success", "message": "Analysis cache cleared"}
+        else:
+            return {"status": "error", "message": "AI selector not initialized"}
     except Exception as e:
-        return {"ok": False, "error": str(e)}
+        return {"status": "error", "message": f"Failed to clear cache: {str(e)}"}
 
 
 # Background Processing Endpoints
@@ -785,8 +842,12 @@ async def preview_result(job_id: str):
     if results is None:
         raise HTTPException(status_code=404, detail="Job not found or not completed")
 
-    selected_clips = [
-        {
+    selected_clips = []
+    for r in results:
+        # Generate thumbnail for this clip
+        thumbnail_path = await generate_thumbnail(r.clip_path)
+        
+        selected_clips.append({
             "path": r.clip_path,
             "score": r.final_score,
             "scene": r.story_arc.scene_classification,
@@ -794,6 +855,7 @@ async def preview_result(job_id: str):
             "importance": r.story_arc.story_importance,
             "reason": r.selection_reason,
             "description": r.description,
+            "thumbnail_path": thumbnail_path,
             "object_analysis": {
                 "key_moments": r.object_analysis.key_moments,
                 "scene_classification": r.object_analysis.scene_classification,
@@ -804,9 +866,7 @@ async def preview_result(job_id: str):
                 "emotional_tone": r.story_arc.emotional_tone,
                 "story_importance": r.story_arc.story_importance,
             },
-        }
-        for r in results
-    ]
+        })
 
     # Minimal preview shape expected by UI
     preview = {

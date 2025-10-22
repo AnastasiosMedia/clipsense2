@@ -211,7 +211,7 @@ class WeddingObjectDetector:
     def _detect_cake(self, frame: np.ndarray, gray: np.ndarray, hsv: np.ndarray) -> int:
         """Detect wedding cake using shape and color analysis"""
         # Look for tall, layered objects with white/cream colors
-        # This is a simplified approach
+        # This is a simplified approach with higher thresholds to avoid false positives
         
         # Detect white/cream colored regions
         lower_white = np.array([0, 0, 200])
@@ -224,14 +224,18 @@ class WeddingObjectDetector:
         cake_count = 0
         for contour in contours:
             area = cv2.contourArea(contour)
-            if area > 1000:  # Minimum area for cake detection
+            if area > 5000:  # Higher minimum area for cake detection (was 1000)
                 # Check aspect ratio (cakes are typically taller than wide)
                 x, y, w, h = cv2.boundingRect(contour)
                 aspect_ratio = h / w if w > 0 else 0
-                if aspect_ratio > 0.8:  # Taller than wide
-                    cake_count += 1
+                # More strict aspect ratio check
+                if aspect_ratio > 1.2:  # Significantly taller than wide (was 0.8)
+                    # Additional check: should be roughly centered in frame
+                    frame_center_x = frame.shape[1] // 2
+                    if abs(x + w//2 - frame_center_x) < frame.shape[1] // 3:
+                        cake_count += 1
         
-        return min(cake_count, 2)  # Cap at 2 cakes max per frame
+        return min(cake_count, 1)  # Cap at 1 cake max per frame (was 2)
     
     def _detect_dancing(self, frame: np.ndarray, gray: np.ndarray, hsv: np.ndarray) -> int:
         """Detect dancing using motion analysis"""

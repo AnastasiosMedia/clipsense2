@@ -19,13 +19,13 @@ export const ProcessingStatus: React.FC<ProcessingStatusProps> = ({
       {processingState.isProcessing && (
         <div className="space-y-3">
           <div className="flex items-center space-x-3">
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary-500"></div>
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
             <span className="text-sm text-gray-300">Rendering...</span>
           </div>
           
           <div className="w-full bg-gray-700 rounded-full h-2">
             <div 
-              className="bg-primary-500 h-2 rounded-full transition-all duration-300"
+              className="bg-white h-2 rounded-full transition-all duration-300"
               style={{ width: `${processingState.progress}%` }}
             ></div>
           </div>

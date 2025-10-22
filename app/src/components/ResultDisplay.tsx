@@ -56,7 +56,7 @@ export const ResultDisplay: React.FC<ResultDisplayProps> = ({
               {metrics.render_time && (
                 <div className="text-center">
                   <div className="text-gray-400">Final Render</div>
-                  <div className="text-blue-400 font-mono">{metrics.render_time.toFixed(1)}s</div>
+                  <div className="text-white font-mono">{metrics.render_time.toFixed(1)}s</div>
                 </div>
               )}
               {metrics.total_time && (

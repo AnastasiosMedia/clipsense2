@@ -25,17 +25,17 @@ export const Toast: React.FC<ToastProps> = ({
   }, [duration, onClose]);
 
   const getToastStyles = () => {
-    const baseStyles = "fixed top-4 right-4 z-50 max-w-sm w-full bg-white shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden transform transition-all duration-300 ease-in-out";
+    const baseStyles = "fixed top-4 right-4 z-50 max-w-sm w-full bg-[#2d2d30] shadow-lg rounded-lg pointer-events-auto ring-1 ring-[#3e3e42] overflow-hidden transform transition-all duration-300 ease-in-out";
     
     if (!isVisible) {
       return `${baseStyles} translate-x-full opacity-0`;
     }
 
     const typeStyles = {
-      success: "bg-green-50 border-l-4 border-green-400",
-      error: "bg-red-50 border-l-4 border-red-400",
-      warning: "bg-yellow-50 border-l-4 border-yellow-400",
-      info: "bg-blue-50 border-l-4 border-blue-400"
+      success: "bg-[#2d2d30] border-l-4 border-green-400",
+      error: "bg-[#2d2d30] border-l-4 border-red-400",
+      warning: "bg-[#2d2d30] border-l-4 border-yellow-400",
+      info: "bg-[#2d2d30] border-l-4 border-[#3e3e42]"
     };
 
     return `${baseStyles} translate-x-0 opacity-100 ${typeStyles[type]}`;
@@ -48,7 +48,7 @@ export const Toast: React.FC<ToastProps> = ({
       success: "text-green-400",
       error: "text-red-400",
       warning: "text-yellow-400",
-      info: "text-blue-400"
+      info: "text-gray-300"
     };
 
     return `${baseStyles} ${typeStyles[type]}`;
@@ -93,13 +93,13 @@ export const Toast: React.FC<ToastProps> = ({
             {getIcon()}
           </div>
           <div className="ml-3 w-0 flex-1">
-            <p className="text-sm font-medium text-gray-900">
+            <p className="text-sm font-medium text-white">
               {message}
             </p>
           </div>
           <div className="ml-4 flex-shrink-0 flex">
             <button
-              className="bg-white rounded-md inline-flex text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              className="bg-[#1e1e1e] rounded-md inline-flex text-[#858585] hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#007acc]"
               onClick={() => {
                 setIsVisible(false);
                 setTimeout(onClose, 300);

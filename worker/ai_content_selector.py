@@ -55,7 +55,15 @@ class AIContentSelector:
         # Simple cache to avoid re-analyzing the same clips
         self._analysis_cache = {}
         
+        # Clear cache on startup to ensure fresh analysis
+        print("INFO:ai_content_selector:🧹 Cleared analysis cache for fresh analysis")
+        
         print("INFO:ai_content_selector:✅ AI Content Selector initialized")
+    
+    def clear_cache(self):
+        """Clear the analysis cache to force fresh analysis"""
+        self._analysis_cache.clear()
+        print("INFO:ai_content_selector:🧹 Analysis cache cleared")
     
     async def analyze_clip(self, 
                           video_path: str,
@@ -72,11 +80,9 @@ class AIContentSelector:
         Returns:
             AIContentSelectionResult with complete analysis
         """
-        # Check cache first
+        # Check cache first (but only for non-object detection parts)
         cache_key = f"{video_path}_{story_style}_{style_preset}_v2"
-        if cache_key in self._analysis_cache:
-            print(f"INFO:ai_content_selector:💾 Using cached analysis for {Path(video_path).name}")
-            return self._analysis_cache[cache_key]
+        # Note: We don't cache object detection as it should be real-time
         
         print(f"INFO:ai_content_selector:🎬 Analyzing clip: {Path(video_path).name}")
         
@@ -154,11 +160,9 @@ class AIContentSelector:
         """
         print(f"INFO:ai_content_selector:⚡ Fast analyzing clip: {Path(video_path).name}")
         
-        # Check cache first
+        # Check cache first (but only for non-object detection parts)
         cache_key = f"{video_path}_{story_style}_{style_preset}_fast_v2"
-        if cache_key in self._analysis_cache:
-            print(f"INFO:ai_content_selector:💾 Using cached fast analysis for {Path(video_path).name}")
-            return self._analysis_cache[cache_key]
+        # Note: We don't cache object detection as it should be real-time
         
         # Only do basic object detection (skip emotion analysis)
         object_analysis = await self.object_detector.analyze_clip(video_path)
@@ -609,24 +613,26 @@ class AIContentSelector:
         """Generate human-readable reason for clip selection"""
         reasons = []
         
-        # Object-based reasons
+        # Object-based reasons (with higher thresholds to avoid false positives)
         objects = object_analysis.objects_detected
-        if objects.get('wedding_rings', 0) > 0:
+        if objects.get('wedding_rings', 0) >= 2:  # Require at least 2 rings
             reasons.append("features ring exchange")
-        if objects.get('wedding_cake', 0) > 0:
+        if objects.get('wedding_cake', 0) >= 2:  # Require at least 2 cakes (very conservative)
             reasons.append("includes cake cutting")
-        if objects.get('ceremony_moments', 0) > 0:
+        if objects.get('ceremony_moments', 0) >= 3:  # Require multiple ceremony moments
             reasons.append("shows ceremony moments")
-        if objects.get('dancing', 0) > 0:
+        if objects.get('dancing', 0) >= 2:  # Require at least 2 people dancing
             reasons.append("captures dancing")
+        if objects.get('people', 0) >= 5:  # Good number of people
+            reasons.append("shows wedding party")
         
-        # Emotion-based reasons
+        # Emotion-based reasons (with higher thresholds)
         emotions = emotion_analysis.emotions
-        if emotions.get('joy', 0) > 0.6:
+        if emotions.get('joy', 0) > 0.7:  # Higher threshold
             reasons.append("high joy and happiness")
-        if emotions.get('love', 0) > 0.5:
+        if emotions.get('love', 0) > 0.6:  # Higher threshold
             reasons.append("romantic and loving")
-        if emotions.get('celebration', 0) > 0.6:
+        if emotions.get('celebration', 0) > 0.7:  # Higher threshold
             reasons.append("celebratory atmosphere")
         
         # Story-based reasons
@@ -634,11 +640,13 @@ class AIContentSelector:
             reasons.append("high story importance")
         if story_arc.emotional_tone == 'romantic':
             reasons.append("romantic tone")
+        if story_arc.emotional_tone == 'intimate':
+            reasons.append("intimate moment")
         if story_arc.narrative_position == 'climax':
             reasons.append("climactic moment")
         
-        # Key moments
-        if len(object_analysis.key_moments) > 2:
+        # Key moments (with higher threshold)
+        if len(object_analysis.key_moments) > 3:
             reasons.append(f"{len(object_analysis.key_moments)} key moments")
         
         # Score-based reason
@@ -649,7 +657,12 @@ class AIContentSelector:
         else:
             reasons.append("decent quality")
         
+        # Fallback reasons based on what we actually detected
         if not reasons:
+            if objects.get('people', 0) > 0:
+                reasons.append("shows people")
+            if story_arc.story_importance > 0.3:
+                reasons.append("story relevance")
             reasons.append("meets basic criteria")
         
         return ", ".join(reasons)
