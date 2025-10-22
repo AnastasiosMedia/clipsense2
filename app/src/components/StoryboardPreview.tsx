@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { AutoCutRequest, StoryStyle, StylePreset } from '../types';
+import { StoryboardGallery } from './StoryboardGallery';
 
 interface StoryboardPreviewProps {
   fileSelection: {
@@ -42,6 +43,9 @@ const StoryboardPreview: React.FC<StoryboardPreviewProps> = ({
   const [selectedStoryStyle, setSelectedStoryStyle] = useState<string>('traditional');
   const [selectedStylePreset, setSelectedStylePreset] = useState<string>('romantic');
   const [useAISelection, setUseAISelection] = useState<boolean>(true);
+  const [viewMode, setViewMode] = useState<'detailed' | 'gallery'>('detailed');
+  const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
+  const [showModalContent, setShowModalContent] = useState(true);
 
   const storyStyles: StoryStyle[] = [
     { id: 'traditional', name: 'Traditional', description: 'Classic wedding story flow' },
@@ -155,17 +159,31 @@ const StoryboardPreview: React.FC<StoryboardPreviewProps> = ({
   const handleGenerate = () => {
     if (!fileSelection.music) return;
 
-    const request: AutoCutRequest = {
-      clips: fileSelection.clips,
-      music: fileSelection.music,
-      target_seconds: fileSelection.clips.length > 20 ? 120 : 60,
-      quality_settings: qualitySettings,
-      story_style: selectedStoryStyle,
-      style_preset: selectedStylePreset,
-      use_ai_selection: useAISelection
-    };
+    // Start fade out animation
+    setShowModalContent(false);
+    
+    // Wait for fade out to complete
+    setTimeout(() => {
+      setIsGeneratingPreview(true);
+      
+      // Simulate generation time (you can replace this with actual API call)
+      setTimeout(() => {
+        setIsGeneratingPreview(false);
+        
+        const request: AutoCutRequest = {
+          clips: fileSelection.clips,
+          music: fileSelection.music,
+          target_seconds: fileSelection.clips.length > 20 ? 120 : 60,
+          quality_settings: qualitySettings,
+          story_style: selectedStoryStyle,
+          style_preset: selectedStylePreset,
+          use_ai_selection: useAISelection
+        };
 
-    onGenerate(request);
+        onGenerate(request);
+        setShowModalContent(true);
+      }, 2000); // 2 seconds for demo
+    }, 300); // 300ms fade out duration
   };
 
   const formatTime = (seconds: number) => {
@@ -180,13 +198,13 @@ const StoryboardPreview: React.FC<StoryboardPreviewProps> = ({
       'joy': 'text-yellow-400',
       'love': 'text-pink-400',
       'excitement': 'text-red-400',
-      'tenderness': 'text-gray-300',
+      'tenderness': 'text-[#aaaaaa]',
       'celebration': 'text-orange-400',
       'happiness': 'text-green-400',
       'romance': 'text-rose-400',
-      'euphoria': 'text-gray-300'
+      'euphoria': 'text-[#aaaaaa]'
     };
-    return colors[emotion] || 'text-gray-400';
+    return colors[emotion] || 'text-[#888888]';
   };
 
   const getSceneTypeIcon = (sceneType: string) => {
@@ -259,31 +277,34 @@ const StoryboardPreview: React.FC<StoryboardPreviewProps> = ({
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
-      <div className="bg-[#1e1e1e] border border-[#3e3e42] rounded-2xl max-w-7xl w-full max-h-[90vh] overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-[#3e3e42]">
+      <div className="bg-[#0d0d0d] border border-[#1a1a1a] rounded-2xl max-w-7xl w-full max-h-[90vh] overflow-hidden">
+        {/* Modal Content with Fade Animation */}
+        <div className={`transition-opacity duration-300 ${showModalContent ? 'opacity-100' : 'opacity-0'}`}>
+          {/* Header */}
+          <div className="flex items-center justify-between p-6 border-b border-[#1a1a1a]">
           <div className="flex items-center">
-            <div className="w-10 h-10 bg-[#2d2d30] rounded-xl flex items-center justify-center mr-4 border border-[#3e3e42]">
-              <div className="w-6 h-6 bg-[#3e3e42] rounded"></div>
+            <div className="w-10 h-10 bg-[#0f0f0f] rounded-xl flex items-center justify-center mr-4 border border-[#1a1a1a]">
+              <div className="w-6 h-6 bg-[#1a1a1a] rounded"></div>
             </div>
             <div>
               <h2 className="text-2xl font-bold text-white">Storyboard Preview</h2>
-              <p className="text-[#858585]">AI-powered clip selection and timeline</p>
+              <p className="text-[#888888]">AI-powered clip selection and timeline</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-xl hover:bg-[#2d2d30] text-[#858585] hover:text-white">
+          <button onClick={onClose} className="p-2 rounded-xl border border-transparent hover:border-[#333333] hover:text-white text-[#888888]">
             ×
           </button>
+          </div>
         </div>
 
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+        <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)] scrollable">
           {/* Ensure a single root inside scroll area to avoid adjacent JSX parse issues */}
           <div>
           {/* AI Selection Options - Always visible */}
           <div className="max-w-2xl mx-auto mb-8 space-y-6">
             <div className="text-center mb-6">
               <h3 className="text-xl font-semibold text-white mb-2">AI-Powered Content Selection</h3>
-              <p className="text-[#858585]">
+              <p className="text-[#888888]">
                 Configure how the AI will select and arrange your clips
               </p>
             </div>
@@ -294,7 +315,7 @@ const StoryboardPreview: React.FC<StoryboardPreviewProps> = ({
                       type="checkbox"
                       checked={useAISelection}
                       onChange={(e) => setUseAISelection(e.target.checked)}
-                      className="w-4 h-4 text-[#007acc] bg-[#2d2d30] border-[#3e3e42] rounded focus:ring-[#007acc] focus:ring-2"
+                      className="w-4 h-4 text-[#007acc] bg-[#0f0f0f] border-[#1a1a1a] rounded focus:ring-[#007acc] focus:ring-2"
                     />
                     <span className="text-white">Use AI-powered content selection</span>
                   </label>
@@ -319,12 +340,12 @@ const StoryboardPreview: React.FC<StoryboardPreviewProps> = ({
                             }}
                             className={`p-3 rounded-lg border text-left transition-all ${
                               selectedStoryStyle === style.id
-                                ? 'border-[#007acc] bg-[#2d2d30] text-white'
-                                : 'border-[#3e3e42] bg-[#1e1e1e] text-white hover:border-[#007acc]'
+                                ? 'border-[#007acc] text-[#007acc]'
+                                : 'border-[#1a1a1a] text-[#888888] hover:border-[#0099ff] hover:text-white'
                             }`}
                           >
                             <div className="font-medium">{style.name}</div>
-                            <div className="text-xs text-[#858585] mt-1">{style.description}</div>
+                            <div className="text-xs text-[#888888] mt-1">{style.description}</div>
                           </button>
                         ))}
                       </div>
@@ -340,12 +361,12 @@ const StoryboardPreview: React.FC<StoryboardPreviewProps> = ({
                             onClick={() => setSelectedStylePreset(preset.id)}
                             className={`p-3 rounded-lg border text-left transition-all ${
                               selectedStylePreset === preset.id
-                                ? 'border-[#007acc] bg-[#2d2d30] text-white'
-                                : 'border-[#3e3e42] bg-[#1e1e1e] text-white hover:border-[#007acc]'
+                                ? 'border-[#007acc] text-[#007acc]'
+                                : 'border-[#1a1a1a] text-[#888888] hover:border-[#0099ff] hover:text-white'
                             }`}
                           >
                             <div className="font-medium">{preset.name}</div>
-                            <div className="text-xs text-[#858585] mt-1">{preset.description}</div>
+                            <div className="text-xs text-[#888888] mt-1">{preset.description}</div>
                           </button>
                         ))}
                       </div>
@@ -383,54 +404,80 @@ const StoryboardPreview: React.FC<StoryboardPreviewProps> = ({
             <div className="space-y-8">
               {/* Overview */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="bg-[#2d2d30] rounded-xl p-4 text-center">
+                <div className="bg-[#0f0f0f] rounded-xl p-4 text-center">
                   <div className="text-2xl font-bold text-white">{previewData?.story_arc?.total_clips ?? (previewData?.selected_clips?.length ?? 0)}</div>
-                  <div className="text-sm text-[#858585]">Selected Clips</div>
+                  <div className="text-sm text-[#888888]">Selected Clips</div>
                 </div>
-                <div className="bg-[#2d2d30] rounded-xl p-4 text-center">
+                <div className="bg-[#0f0f0f] rounded-xl p-4 text-center">
                   <div className="text-2xl font-bold text-white">{typeof previewData?.music_analysis?.tempo === 'number' ? previewData.music_analysis.tempo.toFixed(0) : '—'}</div>
-                  <div className="text-sm text-[#858585]">BPM</div>
+                  <div className="text-sm text-[#888888]">BPM</div>
                 </div>
-                <div className="bg-[#2d2d30] rounded-xl p-4 text-center">
+                <div className="bg-[#0f0f0f] rounded-xl p-4 text-center">
                   <div className="text-2xl font-bold text-white">{formatTime(previewData?.total_duration || 0)}</div>
-                  <div className="text-sm text-[#858585]">Duration</div>
+                  <div className="text-sm text-[#888888]">Duration</div>
                 </div>
-                <div className="bg-[#2d2d30] rounded-xl p-4 text-center">
+                <div className="bg-[#0f0f0f] rounded-xl p-4 text-center">
                   <div className="text-2xl font-bold text-white">{previewData?.story_arc?.key_moments?.length ?? 0}</div>
-                  <div className="text-sm text-[#858585]">Key Moments</div>
+                  <div className="text-sm text-[#888888]">Key Moments</div>
+                </div>
+              </div>
+
+              {/* View Mode Toggle */}
+              <div className="flex justify-center mb-8">
+                <div className="bg-[#0f0f0f] border border-[#1a1a1a] rounded-lg p-1 flex">
+                  <button
+                    onClick={() => setViewMode('detailed')}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${
+                      viewMode === 'detailed'
+                        ? 'bg-[#007acc] text-white'
+                        : 'text-[#888888] hover:text-white'
+                    }`}
+                  >
+                    Detailed Analysis
+                  </button>
+                  <button
+                    onClick={() => setViewMode('gallery')}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${
+                      viewMode === 'gallery'
+                        ? 'bg-[#007acc] text-white'
+                        : 'text-[#888888] hover:text-white'
+                    }`}
+                  >
+                    Storyboard Gallery
+                  </button>
                 </div>
               </div>
 
               {/* AI Analysis Summary */}
-              {previewData.story_arc && (
-                <div className="bg-[#2d2d30] border border-[#3e3e42] rounded-lg p-6 mb-8">
+              {previewData.story_arc && viewMode === 'detailed' && (
+                <div className="bg-[#0f0f0f] border border-[#1a1a1a] rounded-lg p-6 mb-8">
                   <h3 className="text-xl font-medium text-white mb-4">
                     AI Analysis Summary
                   </h3>
                   
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                     <div>
-                      <h4 className="text-gray-300 font-medium mb-2">Story Flow</h4>
+                      <h4 className="text-[#aaaaaa] font-medium mb-2">Story Flow</h4>
                       <div className="flex flex-wrap gap-2">
                         {previewData.story_arc.story_flow?.map((scene, idx) => (
-                          <span key={idx} className="bg-gray-800 text-gray-300 px-3 py-1 rounded text-sm border border-gray-700">
+                          <span key={idx} className="bg-gray-800 text-[#aaaaaa] px-3 py-1 rounded text-sm border border-gray-700">
                             {scene}
                           </span>
                         ))}
                       </div>
                     </div>
                     <div>
-                      <h4 className="text-gray-300 font-medium mb-2">Emotional Journey</h4>
+                      <h4 className="text-[#aaaaaa] font-medium mb-2">Emotional Journey</h4>
                       <div className="flex flex-wrap gap-2">
                         {previewData.story_arc.emotional_journey?.map((tone, idx) => (
-                          <span key={idx} className="bg-gray-800 text-gray-300 px-3 py-1 rounded text-sm border border-gray-700">
+                          <span key={idx} className="bg-gray-800 text-[#aaaaaa] px-3 py-1 rounded text-sm border border-gray-700">
                             {tone}
                           </span>
                         ))}
                       </div>
                     </div>
                     <div>
-                      <h4 className="text-gray-300 font-medium mb-2">Total Clips Analyzed</h4>
+                      <h4 className="text-[#aaaaaa] font-medium mb-2">Total Clips Analyzed</h4>
                       <div className="text-2xl font-bold text-white">
                         {previewData.story_arc.total_clips || 0}
                       </div>
@@ -440,18 +487,19 @@ const StoryboardPreview: React.FC<StoryboardPreviewProps> = ({
               )}
 
               {/* AI Analysis Results */}
-              <div>
-                <h3 className="text-xl font-medium text-white mb-6">
-                  Detailed Clip Analysis
-                </h3>
+              {viewMode === 'detailed' && (
+                <div>
+                  <h3 className="text-xl font-medium text-white mb-6">
+                    Detailed Clip Analysis
+                  </h3>
 
-                <div className="space-y-6">
+                  <div className="space-y-6">
                   {(previewData.selected_clips || []).map((clip, index) => (
-                    <div key={index} className="bg-[#1e1e1e] border border-[#3e3e42] rounded-lg p-6">
+                    <div key={index} className="bg-[#0d0d0d] border border-[#1a1a1a] rounded-lg p-6">
                       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                         {/* Large Thumbnail with Video Aspect Ratio */}
                         <div className="lg:col-span-1">
-                          <div className="w-full bg-[#2d2d30] rounded-lg flex items-center justify-center">
+                          <div className="w-full bg-[#0f0f0f] rounded-lg flex items-center justify-center">
                             {clip.thumbnail_path ? (
                               <div className="relative w-full" style={{ aspectRatio: '16/9' }}>
                                 <img
@@ -461,7 +509,7 @@ const StoryboardPreview: React.FC<StoryboardPreviewProps> = ({
                                 />
                               </div>
                             ) : (
-                              <div className="w-full text-gray-500 text-center" style={{ aspectRatio: '16/9' }}>
+                              <div className="w-full text-[#777777] text-center" style={{ aspectRatio: '16/9' }}>
                                 <div className="flex flex-col items-center justify-center h-full">
                                   <div className="text-4xl mb-2">📹</div>
                                   <div className="text-sm">No Preview</div>
@@ -472,26 +520,26 @@ const StoryboardPreview: React.FC<StoryboardPreviewProps> = ({
                           
                           {/* Quick Stats under thumbnail */}
                           <div className="mt-4 space-y-2">
-                            <div className="flex items-center justify-between py-2 border-b border-[#3e3e42]">
-                              <span className="text-[#858585] text-sm">Score</span>
+                            <div className="flex items-center justify-between py-2 border-b border-[#1a1a1a]">
+                              <span className="text-[#888888] text-sm">Score</span>
                               <span className="text-xl font-medium text-white">
                                 {Math.round((clip.score || 0) * 100)}%
                               </span>
                             </div>
-                            <div className="flex items-center justify-between py-2 border-b border-[#3e3e42]">
-                              <span className="text-[#858585] text-sm">Emotional Tone</span>
+                            <div className="flex items-center justify-between py-2 border-b border-[#1a1a1a]">
+                              <span className="text-[#888888] text-sm">Emotional Tone</span>
                               <span className="text-white text-sm font-medium">{clip.tone || 'Unknown'}</span>
                             </div>
-                            <div className="flex items-center justify-between py-2 border-b border-[#3e3e42]">
-                              <span className="text-[#858585] text-sm">Story Importance</span>
+                            <div className="flex items-center justify-between py-2 border-b border-[#1a1a1a]">
+                              <span className="text-[#888888] text-sm">Story Importance</span>
                               <span className="text-white text-sm font-medium">{Math.round((clip.importance || 0) * 100)}%</span>
                             </div>
-                            <div className="flex items-center justify-between py-2 border-b border-[#3e3e42]">
-                              <span className="text-[#858585] text-sm">Scene Type</span>
+                            <div className="flex items-center justify-between py-2 border-b border-[#1a1a1a]">
+                              <span className="text-[#888888] text-sm">Scene Type</span>
                               <span className="text-white text-sm font-medium">{clip.scene || 'Unknown'}</span>
                             </div>
                             <div className="py-2">
-                              <span className="text-[#858585] text-sm block mb-1">Selection Reason</span>
+                              <span className="text-[#888888] text-sm block mb-1">Selection Reason</span>
                               <span className="text-white text-xs leading-relaxed">{clip.reason || 'AI Analysis'}</span>
                             </div>
                           </div>
@@ -507,7 +555,7 @@ const StoryboardPreview: React.FC<StoryboardPreviewProps> = ({
 
                           {/* AI Analysis - Primary Content */}
                           {clip.description && (
-                            <div className="mb-6 p-6 bg-[#2d2d30] border border-[#3e3e42] rounded-lg">
+                            <div className="mb-6 p-6 bg-[#0f0f0f] border border-[#1a1a1a] rounded-lg">
                               <h5 className="text-white font-medium mb-3 text-lg">AI Analysis</h5>
                               <p className="text-white text-base leading-relaxed mb-4">
                                 {clip.description}
@@ -516,15 +564,15 @@ const StoryboardPreview: React.FC<StoryboardPreviewProps> = ({
                               {/* AI Analysis Details */}
                               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                                 <div>
-                                  <span className="text-[#858585] block">Emotional Tone</span>
+                                  <span className="text-[#888888] block">Emotional Tone</span>
                                   <span className="text-white font-medium">{clip.tone || 'Unknown'}</span>
                                 </div>
                                 <div>
-                                  <span className="text-[#858585] block">Story Importance</span>
+                                  <span className="text-[#888888] block">Story Importance</span>
                                   <span className="text-white font-medium">{Math.round((clip.importance || 0) * 100)}%</span>
                                 </div>
                                 <div>
-                                  <span className="text-[#858585] block">Scene Classification</span>
+                                  <span className="text-[#888888] block">Scene Classification</span>
                                   <span className="text-white font-medium">{clip.scene || 'Unknown'}</span>
                                 </div>
                               </div>
@@ -536,14 +584,14 @@ const StoryboardPreview: React.FC<StoryboardPreviewProps> = ({
 
                             {/* Object Detection */}
                             {clip.object_analysis && (
-                              <div className="bg-[#2d2d30] border border-[#3e3e42] rounded-lg p-6">
+                              <div className="bg-[#0f0f0f] border border-[#1a1a1a] rounded-lg p-6">
                                 <h5 className="text-white font-medium mb-4 text-lg">
                                   Object Detection
                                 </h5>
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                   {Object.entries(clip.object_analysis.objects_detected || {}).map(([object, count]) => (
-                                    <div key={object} className="flex items-center justify-between py-3 border-b border-[#3e3e42]">
-                                      <span className="text-[#858585] text-sm capitalize">
+                                    <div key={object} className="flex items-center justify-between py-3 border-b border-[#1a1a1a]">
+                                      <span className="text-[#888888] text-sm capitalize">
                                         {object.replace(/_/g, ' ')}
                                       </span>
                                       <span className="text-white font-medium text-lg">{count as number}</span>
@@ -551,8 +599,8 @@ const StoryboardPreview: React.FC<StoryboardPreviewProps> = ({
                                   ))}
                                 </div>
                                 {clip.object_analysis.key_moments && (
-                                  <div className="mt-3 pt-3 border-t border-[#3e3e42]">
-                                    <span className="text-[#858585] text-sm">Key Moments: </span>
+                                  <div className="mt-3 pt-3 border-t border-[#1a1a1a]">
+                                    <span className="text-[#888888] text-sm">Key Moments: </span>
                                     <span className="text-white text-sm">
                                       {clip.object_analysis.key_moments.map((moment: number) => `${moment.toFixed(1)}s`).join(', ')}
                                     </span>
@@ -566,11 +614,23 @@ const StoryboardPreview: React.FC<StoryboardPreviewProps> = ({
                       </div>
                     </div>
                   ))}
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {/* Storyboard Gallery */}
+              {viewMode === 'gallery' && previewData.selected_clips && (
+                <StoryboardGallery 
+                  clips={previewData.selected_clips}
+                  onClipClick={(clip, index) => {
+                    // Optional: Handle clip click (e.g., show detailed view)
+                    console.log('Clicked clip:', clip, 'at index:', index);
+                  }}
+                />
+              )}
 
               {/* Actions */}
-              <div className="flex justify-center space-x-4 pt-6 border-t border-[#3e3e42]">
+              <div className="flex justify-center space-x-4 pt-6 border-t border-[#1a1a1a]">
                 <button onClick={onClose} className="btn-secondary px-8 py-3">Cancel</button>
                 <button onClick={handleGenerate} className="btn-primary px-8 py-3">Generate Video</button>
               </div>
@@ -578,6 +638,17 @@ const StoryboardPreview: React.FC<StoryboardPreviewProps> = ({
           )}
           </div>
         </div>
+
+        {/* Generating Preview Animation */}
+        {isGeneratingPreview && (
+          <div className="absolute inset-0 bg-[#0d0d0d] flex items-center justify-center">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[#007acc] mx-auto mb-4"></div>
+              <h2 className="text-2xl font-bold text-white mb-2">Generating Preview...</h2>
+              <p className="text-[#888888]">Creating your highlight video</p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

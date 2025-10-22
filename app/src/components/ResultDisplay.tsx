@@ -30,7 +30,7 @@ export const ResultDisplay: React.FC<ResultDisplayProps> = ({
       <div className="space-y-3">
         <div className="bg-green-900/20 border border-green-500/50 rounded-lg p-4">
           <p className="text-sm text-green-300 mb-2">Output file:</p>
-          <p className="text-xs text-gray-300 font-mono break-all">
+          <p className="text-xs text-[#666666] font-mono break-all">
             {outputPath}
           </p>
         </div>
@@ -44,24 +44,24 @@ export const ResultDisplay: React.FC<ResultDisplayProps> = ({
         
         {/* Processing Metrics */}
         {metrics && (metrics.proxy_time || metrics.render_time || metrics.total_time) && (
-          <div className="mt-4 pt-4 border-t border-gray-600">
-            <h4 className="text-sm font-medium text-gray-300 mb-2">Processing Metrics</h4>
+          <div className="mt-4 pt-4 border-t border-[#1a1a1a]">
+            <h4 className="text-sm font-medium text-[#666666] mb-2">Processing Metrics</h4>
             <div className="grid grid-cols-3 gap-4 text-xs">
               {metrics.proxy_time && (
                 <div className="text-center">
-                  <div className="text-gray-400">Proxy Creation</div>
+                  <div className="text-[#555555]">Proxy Creation</div>
                   <div className="text-green-400 font-mono">{metrics.proxy_time.toFixed(1)}s</div>
                 </div>
               )}
               {metrics.render_time && (
                 <div className="text-center">
-                  <div className="text-gray-400">Final Render</div>
+                  <div className="text-[#555555]">Final Render</div>
                   <div className="text-white font-mono">{metrics.render_time.toFixed(1)}s</div>
                 </div>
               )}
               {metrics.total_time && (
                 <div className="text-center">
-                  <div className="text-gray-400">Total Time</div>
+                  <div className="text-[#555555]">Total Time</div>
                   <div className="text-yellow-400 font-mono">{metrics.total_time.toFixed(1)}s</div>
                 </div>
               )}

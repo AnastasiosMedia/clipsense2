@@ -25,17 +25,17 @@ export const Toast: React.FC<ToastProps> = ({
   }, [duration, onClose]);
 
   const getToastStyles = () => {
-    const baseStyles = "fixed top-4 right-4 z-50 max-w-sm w-full bg-[#2d2d30] shadow-lg rounded-lg pointer-events-auto ring-1 ring-[#3e3e42] overflow-hidden transform transition-all duration-300 ease-in-out";
+    const baseStyles = "fixed top-4 right-4 z-50 max-w-sm w-full bg-[#0f0f0f] shadow-lg rounded-lg pointer-events-auto ring-1 ring-[#1a1a1a] overflow-hidden transform transition-all duration-300 ease-in-out";
     
     if (!isVisible) {
       return `${baseStyles} translate-x-full opacity-0`;
     }
 
     const typeStyles = {
-      success: "bg-[#2d2d30] border-l-4 border-green-400",
-      error: "bg-[#2d2d30] border-l-4 border-red-400",
-      warning: "bg-[#2d2d30] border-l-4 border-yellow-400",
-      info: "bg-[#2d2d30] border-l-4 border-[#3e3e42]"
+      success: "bg-[#0f0f0f] border-l-4 border-green-400",
+      error: "bg-[#0f0f0f] border-l-4 border-red-400",
+      warning: "bg-[#0f0f0f] border-l-4 border-yellow-400",
+      info: "bg-[#0f0f0f] border-l-4 border-[#1a1a1a]"
     };
 
     return `${baseStyles} translate-x-0 opacity-100 ${typeStyles[type]}`;
@@ -99,7 +99,7 @@ export const Toast: React.FC<ToastProps> = ({
           </div>
           <div className="ml-4 flex-shrink-0 flex">
             <button
-              className="bg-[#1e1e1e] rounded-md inline-flex text-[#858585] hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#007acc]"
+              className="border border-[#1a1a1a] rounded-md inline-flex text-[#666666] hover:border-[#333333] hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#007acc]"
               onClick={() => {
                 setIsVisible(false);
                 setTimeout(onClose, 300);

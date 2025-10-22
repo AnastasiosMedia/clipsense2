@@ -181,13 +181,14 @@ function App() {
     }
   };
 
+
   const canProcess = fileSelection.clips.length > 0 && 
                     fileSelection.music && 
                     !processingState.isProcessing &&
                     backendStatus === 'connected';
 
   return (
-    <div className="min-h-screen bg-[#1e1e1e] p-6">
+    <div className="min-h-screen bg-[#0d0d0d] p-6">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
@@ -267,17 +268,6 @@ function App() {
           </div>
         </div>
 
-        {/* Instructions */}
-        <div className="mt-8 card">
-          <h3 className="text-lg font-semibold mb-3">How to use</h3>
-          <ol className="list-decimal list-inside space-y-2 text-sm text-gray-300">
-            <li>Click "Pick Clips" to select multiple video files</li>
-            <li>Click "Pick Music" to select one audio file</li>
-            <li>Click "Auto-Cut" to generate your highlight video</li>
-            <li>Wait for processing to complete (usually 1-2 minutes)</li>
-            <li>Click "Open File Location" to view your result</li>
-          </ol>
-        </div>
       </div>
       
       {/* Preview Modal */}

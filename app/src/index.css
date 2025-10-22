@@ -8,54 +8,59 @@
   }
   
   body {
-    @apply bg-[#1e1e1e] text-white;
+    @apply bg-[#0d0d0d] text-white;
   }
   
-  /* Custom scrollbar - ultra thin, minimal, dark */
-  ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-  
-  ::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  
-  ::-webkit-scrollbar-thumb {
-    background: #2d2d30;
-    border-radius: 3px;
-    border: 1px solid #1e1e1e;
-  }
-  
-  ::-webkit-scrollbar-thumb:hover {
-    background: #3e3e42;
-  }
-  
-  ::-webkit-scrollbar-corner {
-    background: transparent;
-  }
-  
-  /* Firefox scrollbar */
+  /* Hide all scrollbars completely while keeping scroll functionality */
   * {
-    scrollbar-width: thin;
-    scrollbar-color: #2d2d30 transparent;
+    scrollbar-width: none !important; /* Firefox */
+    -ms-overflow-style: none !important; /* IE/Edge */
+  }
+  
+  *::-webkit-scrollbar {
+    display: none !important; /* WebKit browsers (Chrome, Safari, Edge) */
+  }
+  
+  /* Ensure scrollbars are hidden on all elements */
+  html, body, div, section, main, aside, article {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+  }
+  
+  html::-webkit-scrollbar,
+  body::-webkit-scrollbar,
+  div::-webkit-scrollbar,
+  section::-webkit-scrollbar,
+  main::-webkit-scrollbar,
+  aside::-webkit-scrollbar,
+  article::-webkit-scrollbar {
+    display: none !important;
   }
 }
 
 @layer components {
   .btn-primary {
-    @apply bg-[#007acc] hover:bg-[#005a9e] text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply border border-[#007acc] text-[#007acc] hover:border-[#0099ff] hover:text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
   }
   
   .btn-secondary {
-    @apply bg-[#2d2d30] hover:bg-[#3e3e42] text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed border border-[#3e3e42];
+    @apply border border-[#1a1a1a] text-[#666666] hover:border-[#333333] hover:text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
   }
   
   .card {
-    @apply bg-[#2d2d30] border border-[#3e3e42] rounded-lg p-6;
+    @apply bg-[#0f0f0f] border border-[#1a1a1a] rounded-lg p-6;
   }
   
   .input-field {
-    @apply bg-[#2d2d30] border border-[#3e3e42] rounded-lg px-3 py-2 text-white placeholder-[#858585] focus:outline-none focus:ring-2 focus:ring-[#007acc] focus:border-transparent;
+    @apply bg-[#0f0f0f] border border-[#1a1a1a] rounded-lg px-3 py-2 text-white placeholder-[#666666] focus:outline-none focus:ring-2 focus:ring-[#007acc] focus:border-transparent;
+  }
+  
+  .scrollable {
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+  }
+  
+  .scrollable::-webkit-scrollbar {
+    display: none !important;
   }
 }
