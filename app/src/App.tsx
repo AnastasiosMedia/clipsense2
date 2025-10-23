@@ -4,6 +4,7 @@ import { ProcessingStatus } from './components/ProcessingStatus';
 import { ResultDisplay } from './components/ResultDisplay';
 import { ToastContainer, ToastData } from './components/ToastContainer';
 import { VideoPreviewModal } from './components/VideoPreviewModal';
+import { StoryNarrative } from './components/StoryNarrative';
 import { ApiService } from './services/api';
 import StoryboardPreview from './components/StoryboardPreview';
 import { FileSelection, ProcessingState } from './types';
@@ -37,6 +38,7 @@ function App() {
   }>({});
   const [showPreview, setShowPreview] = useState(false);
   const [showVideoPreview, setShowVideoPreview] = useState(false);
+  const [showStoryNarrative, setShowStoryNarrative] = useState(false);
 
   // Check backend connection on mount
   useEffect(() => {
@@ -208,13 +210,13 @@ function App() {
           {/* Backend Status */}
           <div className="mt-4">
             {backendStatus === 'checking' && (
-              <div className="inline-flex items-center space-x-2 text-yellow-400">
+              <div className="inline-flex items-center space-x-2 text-yellow-400 transition-all duration-500 ease-in-out">
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-400"></div>
                 <span className="text-sm">Checking backend...</span>
               </div>
             )}
             {backendStatus === 'connected' && (
-              <div className="inline-flex items-center space-x-2 text-green-400">
+              <div className="inline-flex items-center space-x-2 text-green-400 transition-all duration-500 ease-in-out">
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                 </svg>
@@ -222,7 +224,7 @@ function App() {
               </div>
             )}
             {backendStatus === 'error' && (
-              <div className="inline-flex items-center space-x-2 text-red-400">
+              <div className="inline-flex items-center space-x-2 text-red-400 transition-all duration-500 ease-in-out">
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                 </svg>
@@ -232,9 +234,9 @@ function App() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 transition-all duration-500 ease-in-out">
           {/* File Selection */}
-          <div>
+          <div className="transition-all duration-500 ease-in-out">
             <FilePicker
               fileSelection={fileSelection}
               onFileSelectionChange={setFileSelection}
@@ -243,7 +245,7 @@ function App() {
           </div>
 
           {/* Processing Controls */}
-          <div className="space-y-6">
+          <div className="space-y-6 transition-all duration-500 ease-in-out">
             {/* Auto-Cut Button */}
             <div className="card">
               <h3 className="text-lg font-semibold mb-3">Generate Highlight</h3>
@@ -263,6 +265,13 @@ function App() {
                 className="btn-yellow w-full text-lg py-3 mt-3"
               >
                 Preview Storyboard
+              </button>
+              <button
+                onClick={() => setShowStoryNarrative(true)}
+                disabled={!canProcess}
+                className="btn-secondary w-full text-lg py-3 mt-3"
+              >
+                AI Story Builder
               </button>
             </div>
 
@@ -371,6 +380,20 @@ function App() {
           onClose={() => setShowVideoPreview(false)}
           videoPath={outputPath}
           videoName="Highlight Video"
+        />
+      )}
+
+      {/* Story Narrative Modal */}
+      {showStoryNarrative && (
+        <StoryNarrative
+          clips={fileSelection.clips}
+          onClose={() => setShowStoryNarrative(false)}
+          onGenerateVideo={(selectedClips) => {
+            console.log('Generating video from story narrative:', selectedClips);
+            setShowStoryNarrative(false);
+            // TODO: Implement video generation from story narrative
+            addToast('Story-based video generation coming soon!', 'info');
+          }}
         />
       )}
 

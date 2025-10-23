@@ -95,6 +95,31 @@ export class ApiService {
     });
   }
 
+  static async generateStoryNarrative(request: {
+    clips: string[];
+    narrative_style?: string;
+    target_duration?: number;
+  }): Promise<{
+    ok: boolean;
+    story_narrative?: {
+      story_title: string;
+      story_theme: string;
+      narrative_structure: string;
+      story_arc: any[];
+      selected_clips: any[];
+      narrative_flow: string;
+      emotional_journey: string[];
+      story_duration: number;
+      story_notes: string;
+    };
+    error?: string;
+  }> {
+    return this.request('/generate_story_narrative', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    });
+  }
+
   // Async preview flow
   static async previewStart(request: AutoCutRequest): Promise<{ ok: boolean; job_id?: string; error?: string }> {
     return this.request<{ ok: boolean; job_id?: string; error?: string }>('/preview/start', {

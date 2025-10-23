@@ -24,12 +24,14 @@ try:
     from .story_arc_creator import StoryArcCreator, StoryArcResult
     from .style_presets import StylePresetEngine, StylePresetResult
     from .openai_vision import OpenAIVisionClient
+    from .ai_story_narrative import AIStoryNarrativeGenerator, ClipDescription, StoryNarrative
 except ImportError:
     from wedding_object_detector import WeddingObjectDetector, WeddingObjectDetectionResult
     from emotion_analyzer import EmotionAnalyzer, EmotionAnalysisResult
     from story_arc_creator import StoryArcCreator, StoryArcResult
     from style_presets import StylePresetEngine, StylePresetResult
     from openai_vision import OpenAIVisionClient
+    from ai_story_narrative import AIStoryNarrativeGenerator, ClipDescription, StoryNarrative
 
 class AIContentSelectionResult(BaseModel):
     """Result of AI-powered content selection"""
@@ -51,6 +53,7 @@ class AIContentSelector:
         self.story_creator = StoryArcCreator()
         self.style_engine = StylePresetEngine()
         self.vision = OpenAIVisionClient()
+        self.story_narrative = AIStoryNarrativeGenerator()
         
         # Simple cache to avoid re-analyzing the same clips
         self._analysis_cache = {}
@@ -787,3 +790,64 @@ class AIContentSelector:
             'high_quality_clips': len([s for s in scores if s > 0.7]),
             'story_importance_avg': sum(clip.story_arc.story_importance for clip in selected_clips) / len(selected_clips)
         }
+    
+    async def generate_story_narrative(self, 
+                                     video_paths: List[str],
+                                     narrative_style: str = 'modern',
+                                     target_duration: float = 60.0) -> StoryNarrative:
+        """
+        Generate a complete story narrative from video clips
+        
+        Args:
+            video_paths: List of video file paths
+            narrative_style: Style of narrative ('traditional', 'modern', 'cinematic', 'documentary')
+            target_duration: Target duration for the final story in seconds
+            
+        Returns:
+            StoryNarrative with complete story structure
+        """
+        print(f"INFO:ai_content_selector:🎬 Generating {narrative_style} story narrative from {len(video_paths)} clips")
+        
+        # Analyze all clips to create descriptions
+        clip_descriptions = []
+        
+        for video_path in video_paths:
+            print(f"INFO:ai_content_selector:📹 Analyzing clip: {Path(video_path).name}")
+            
+            # Run AI analysis on the clip
+            try:
+                print(f"INFO:ai_content_selector:🔍 Starting analysis for {video_path}")
+                analysis_result = await self.analyze_clip(video_path, 'traditional', 'romantic')
+                print(f"INFO:ai_content_selector:✅ Analysis completed for {video_path}")
+                
+                # Create clip description from analysis
+                clip_description = ClipDescription(
+                    clip_path=video_path,
+                    description=analysis_result.description,
+                    scene_type=analysis_result.story_arc.scene_classification,
+                    emotional_tone=analysis_result.story_arc.emotional_tone,
+                    key_moments=[str(moment) for moment in analysis_result.object_analysis.key_moments],
+                    people_count=analysis_result.object_analysis.people_count,
+                    quality_score=analysis_result.final_score,
+                    timestamp=0.0  # We'll calculate this based on selection order
+                )
+                
+                clip_descriptions.append(clip_description)
+                print(f"INFO:ai_content_selector:✅ Clip description created for {video_path}")
+                
+            except Exception as e:
+                print(f"WARNING:ai_content_selector:Failed to analyze {video_path}: {e}")
+                import traceback
+                traceback.print_exc()
+                continue
+        
+        if not clip_descriptions:
+            raise ValueError("No clips could be analyzed for story generation")
+        
+        # Generate story narrative
+        story_narrative = await self.story_narrative.generate_story_narrative(
+            clip_descriptions, narrative_style, target_duration
+        )
+        
+        print(f"INFO:ai_content_selector:✅ Generated story: '{story_narrative.story_title}'")
+        return story_narrative

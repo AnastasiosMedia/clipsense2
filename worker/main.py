@@ -14,10 +14,11 @@ import time
 import socket
 from pathlib import Path
 from typing import List, Optional, Dict, Any
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+import json
 try:
     # Try relative imports first (when run as module)
     from .video_processor import VideoProcessor
@@ -28,6 +29,7 @@ try:
     from .fcp7_xml_generator import generate_fcp7_xml
     from .visual_analyzer import VisualAnalyzer
     from .ai_content_selector import AIContentSelector
+    from .ai_story_narrative import StoryNarrative
     from .background_processor import background_processor, ProcessingStatus
 except ImportError:
     # Fall back to absolute imports (when run directly)
@@ -39,6 +41,7 @@ except ImportError:
     from fcp7_xml_generator import generate_fcp7_xml
     from visual_analyzer import VisualAnalyzer
     from ai_content_selector import AIContentSelector
+    from ai_story_narrative import StoryNarrative
     from background_processor import background_processor, ProcessingStatus
 
 # Global state
@@ -46,6 +49,31 @@ ffmpeg_available = False
 ffmpeg_path = None
 ffprobe_path = None
 ffmpeg_version = None
+
+# WebSocket connection manager
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: List[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.remove(websocket)
+
+    async def send_personal_message(self, message: str, websocket: WebSocket):
+        await websocket.send_text(message)
+
+    async def broadcast(self, message: str):
+        for connection in self.active_connections:
+            try:
+                await connection.send_text(message)
+            except:
+                # Remove disconnected connections
+                self.active_connections.remove(connection)
+
+manager = ConnectionManager()
 
 # Thumbnail directory
 THUMBNAIL_DIR = "/tmp/clipsense_thumbnails"
@@ -286,6 +314,12 @@ class BackgroundJobRequest(BaseModel):
     target_duration: int = 60
     story_style: str = 'traditional'
     style_preset: str = 'romantic'
+
+class StoryNarrativeRequest(BaseModel):
+    """Request model for story narrative generation"""
+    clips: List[str]
+    narrative_style: str = 'modern'
+    target_duration: float = 60.0
 
 class BackgroundJobResponse(BaseModel):
     """Response model for background job creation"""
@@ -1016,11 +1050,188 @@ async def get_job_results(job_id: str):
     
     return {"ok": True, "results": results_dict}
 
+@app.post("/generate_story_narrative")
+async def generate_story_narrative(request: dict):
+    """Generate a complete story narrative from video clips"""
+    try:
+        video_paths = request.get("clips", [])
+        narrative_style = request.get("narrative_style", "modern")
+        target_duration = request.get("target_duration", 60.0)
+        
+        if not video_paths:
+            raise HTTPException(status_code=400, detail="No clips provided")
+        
+        # Validate clip files
+        for clip_path in video_paths:
+            if not os.path.exists(clip_path):
+                raise HTTPException(status_code=400, detail=f"Clip file not found: {clip_path}")
+        
+        print(f"🎬 Generating {narrative_style} story narrative from {len(video_paths)} clips")
+        
+        # Generate story narrative
+        ai_selector = AIContentSelector()
+        story_narrative = await ai_selector.generate_story_narrative(
+            video_paths, narrative_style, target_duration
+        )
+        
+        # Convert to dict for JSON response
+        story_dict = {
+            "story_title": story_narrative.story_title,
+            "story_theme": story_narrative.story_theme,
+            "narrative_structure": story_narrative.narrative_structure,
+            "story_arc": story_narrative.story_arc,
+            "selected_clips": [
+                {
+                    "clip_path": clip.clip_path,
+                    "description": clip.description,
+                    "scene_type": clip.scene_type,
+                    "emotional_tone": clip.emotional_tone,
+                    "key_moments": clip.key_moments,
+                    "people_count": clip.people_count,
+                    "quality_score": clip.quality_score,
+                    "timestamp": clip.timestamp
+                }
+                for clip in story_narrative.selected_clips
+            ],
+            "narrative_flow": story_narrative.narrative_flow,
+            "emotional_journey": story_narrative.emotional_journey,
+            "story_duration": story_narrative.story_duration,
+            "story_notes": story_narrative.story_notes
+        }
+        
+        print(f"✅ Generated story: '{story_narrative.story_title}'")
+        return {"ok": True, "story_narrative": story_dict}
+        
+    except Exception as e:
+        print(f"❌ Story narrative generation failed: {e}")
+        return {"ok": False, "error": str(e)}
+
+@app.post("/generate_story_narrative_live")
+async def generate_story_narrative_live_endpoint(request: StoryNarrativeRequest):
+    """Generate AI story narrative with live WebSocket updates"""
+    try:
+        print(f"🎬 Live story narrative request: {len(request.clips)} clips, style: {request.narrative_style}")
+        
+        # Initialize AI components
+        ai_selector = AIContentSelector()
+        story_generator = AIStoryNarrativeGenerator()
+        
+        # Progress callback for WebSocket updates
+        async def progress_callback(progress_data):
+            await manager.broadcast(json.dumps({
+                "type": "story_progress",
+                "data": progress_data
+            }))
+        
+        # Analyze clips and generate descriptions
+        clip_descriptions = []
+        for i, video_path in enumerate(request.clips):
+            print(f"📹 Analyzing clip: {Path(video_path).name}")
+            
+            # Send clip analysis progress
+            await progress_callback({
+                "type": "clip_analysis_started",
+                "clip_index": i + 1,
+                "total_clips": len(request.clips),
+                "clip_name": Path(video_path).name,
+                "message": f"Analyzing clip {i + 1}/{len(request.clips)}: {Path(video_path).name}"
+            })
+            
+            try:
+                analysis_result = await ai_selector.analyze_clip(video_path, request.narrative_style, 'romantic')
+                
+                # Create clip description
+                clip_description = ClipDescription(
+                    clip_path=video_path,
+                    description=analysis_result.description,
+                    scene_type=analysis_result.story_arc.scene_classification,
+                    emotional_tone=analysis_result.story_arc.emotional_tone,
+                    key_moments=[str(moment) for moment in analysis_result.object_analysis.key_moments],
+                    people_count=analysis_result.object_analysis.people_count,
+                    quality_score=analysis_result.final_score,
+                    timestamp=0.0
+                )
+                clip_descriptions.append(clip_description)
+                
+                # Send clip analysis complete
+                await progress_callback({
+                    "type": "clip_analysis_complete",
+                    "clip_index": i + 1,
+                    "total_clips": len(request.clips),
+                    "clip_name": Path(video_path).name,
+                    "quality_score": analysis_result.final_score,
+                    "scene_type": analysis_result.story_arc.scene_classification,
+                    "emotional_tone": analysis_result.story_arc.emotional_tone,
+                    "message": f"Completed analysis of {Path(video_path).name} (score: {analysis_result.final_score:.2f})"
+                })
+                
+                print(f"✅ Clip description created for {Path(video_path).name}")
+            except Exception as e:
+                print(f"WARNING:ai_content_selector:Failed to analyze {video_path}: {e}")
+                await progress_callback({
+                    "type": "clip_analysis_failed",
+                    "clip_index": i + 1,
+                    "total_clips": len(request.clips),
+                    "clip_name": Path(video_path).name,
+                    "error": str(e),
+                    "message": f"Failed to analyze {Path(video_path).name}: {str(e)}"
+                })
+                continue
+        
+        if not clip_descriptions:
+            await progress_callback({
+                "type": "analysis_failed",
+                "message": "No clips could be analyzed for story generation"
+            })
+            return {"ok": False, "error": "No clips could be analyzed for story generation"}
+        
+        # Generate story narrative with progress callbacks
+        story_narrative = await story_generator.generate_story_narrative(
+            clip_descriptions, 
+            request.narrative_style, 
+            request.target_duration,
+            progress_callback
+        )
+        
+        # Send final result
+        await progress_callback({
+            "type": "story_complete",
+            "story_title": story_narrative.story_title,
+            "selected_count": len(story_narrative.selected_clips),
+            "rejected_count": len(story_narrative.rejected_clips),
+            "message": f"Story '{story_narrative.story_title}' completed with {len(story_narrative.selected_clips)} selected clips"
+        })
+        
+        print(f"✅ Generated story: '{story_narrative.story_title}'")
+        return {"ok": True, "story_narrative": story_narrative}
+        
+    except Exception as e:
+        print(f"❌ Story narrative generation failed: {e}")
+        await manager.broadcast(json.dumps({
+            "type": "story_error",
+            "error": str(e),
+            "message": f"Story generation failed: {str(e)}"
+        }))
+        return {"ok": False, "error": str(e)}
+
 @app.post("/background/cleanup")
 async def cleanup_old_jobs():
     """Clean up old completed jobs"""
     cleaned_count = background_processor.cleanup_old_jobs()
     return {"ok": True, "cleaned_jobs": cleaned_count}
+
+@app.websocket("/ws/live-analysis")
+async def websocket_endpoint(websocket: WebSocket):
+    """WebSocket endpoint for live analysis updates"""
+    await manager.connect(websocket)
+    try:
+        while True:
+            # Keep connection alive
+            data = await websocket.receive_text()
+            # Echo back for connection testing
+            await manager.send_personal_message(f"Echo: {data}", websocket)
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
 
 if __name__ == "__main__":
     import uvicorn

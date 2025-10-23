@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AutoCutRequest, StoryStyle, StylePreset } from '../types';
 import { StoryboardGallery } from './StoryboardGallery';
 
@@ -46,6 +46,31 @@ const StoryboardPreview: React.FC<StoryboardPreviewProps> = ({
   const [viewMode, setViewMode] = useState<'detailed' | 'gallery'>('detailed');
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
   const [showModalContent, setShowModalContent] = useState(true);
+  const [progressStep, setProgressStep] = useState(0);
+  const [progressMessage, setProgressMessage] = useState('');
+  const [hasStartedGeneration, setHasStartedGeneration] = useState(false);
+  const [isModalVisible, setIsModalVisible] = useState(false);
+
+  // Fade-in animation on mount
+  useEffect(() => {
+    // Trigger fade-in animation
+    const timer = setTimeout(() => {
+      setIsModalVisible(true);
+    }, 10); // Small delay to ensure DOM is ready
+    
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Prevent background scrolling when modal is open
+  useEffect(() => {
+    // Disable body scroll when modal opens
+    document.body.style.overflow = 'hidden';
+    
+    // Cleanup: re-enable body scroll when modal closes
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, []);
 
   const storyStyles: StoryStyle[] = [
     { id: 'traditional', name: 'Traditional', description: 'Classic wedding story flow' },
@@ -69,8 +94,12 @@ const StoryboardPreview: React.FC<StoryboardPreviewProps> = ({
       return;
     }
 
+    // Mark that generation has started (permanently hide AI Selection Options)
+    setHasStartedGeneration(true);
+    
     setIsLoading(true);
     setIsGeneratingPreview(true);
+    setProgressStep(0);
     setError(null);
 
     try {
@@ -93,6 +122,9 @@ const StoryboardPreview: React.FC<StoryboardPreviewProps> = ({
         quality_settings: request.quality_settings
       });
 
+      // Update progress: Step 1 - Analyzing video clips
+      setProgressStep(1);
+
       // Start async job
       const startT = Date.now();
       const startResp = await ApiService.previewStart(request);
@@ -102,13 +134,34 @@ const StoryboardPreview: React.FC<StoryboardPreviewProps> = ({
         return;
       }
 
+      // Update progress: Step 2 - Detecting objects and scenes
+      setProgressStep(2);
+      
+      // Add a small delay to show step 2
+      await new Promise(resolve => setTimeout(resolve, 800));
+
       // Poll status until completed
       const jobId = startResp.job_id;
-      const pollIntervalMs = 1500;
+      const pollIntervalMs = 2000; // Increased interval
       const maxPolls = Math.ceil((request.target_seconds * 2000) / pollIntervalMs) + 40;
       let polls = 0;
       while (polls < maxPolls) {
         polls++;
+        
+        // Update progress based on polling stage - much slower progression
+        if (polls === 1) {
+          setProgressStep(3); // Analyzing emotional content
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        } else if (polls === 3) {
+          setProgressStep(4); // Processing music and timing
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        } else if (polls === 6) {
+          setProgressStep(5); // Creating story narrative
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        } else if (polls === 10) {
+          setProgressStep(6); // Generating final preview
+        }
+        
         const status = await ApiService.previewStatus(jobId);
         console.log('🧪 Preview status ←', status);
           if (status.status === 'completed') {
@@ -163,28 +216,67 @@ const StoryboardPreview: React.FC<StoryboardPreviewProps> = ({
     }
   };
 
+  const handleClose = () => {
+    // Start fade-out animation
+    setIsModalVisible(false);
+    
+    // Wait for animation to complete before calling onClose
+    setTimeout(() => {
+      onClose();
+    }, 500); // Match the transition duration
+  };
+
   const handleGenerate = () => {
     if (!fileSelection.music) return;
 
-    // Immediately start generating preview
-    setIsGeneratingPreview(true);
+    // Mark that generation has started (permanently hide AI Selection Options)
+    setHasStartedGeneration(true);
     
-    // Simulate generation time (you can replace this with actual API call)
-    setTimeout(() => {
-      setIsGeneratingPreview(false);
-      
-      const request: AutoCutRequest = {
-        clips: fileSelection.clips,
-        music: fileSelection.music,
-        target_seconds: fileSelection.clips.length > 20 ? 120 : 60,
-        quality_settings: qualitySettings,
-        story_style: selectedStoryStyle,
-        style_preset: selectedStylePreset,
-        use_ai_selection: useAISelection
-      };
+    // Immediately start generating preview with progress updates
+    setIsGeneratingPreview(true);
+    setProgressStep(0);
+    setProgressMessage('Initializing analysis...');
+    
+    // Progress simulation with realistic steps
+    const progressSteps = [
+      { step: 1, message: 'Analyzing video clips...', delay: 500 },
+      { step: 2, message: 'Detecting objects and scenes...', delay: 800 },
+      { step: 3, message: 'Analyzing emotional content...', delay: 600 },
+      { step: 4, message: 'Processing music and timing...', delay: 700 },
+      { step: 5, message: 'Creating story narrative...', delay: 600 },
+      { step: 6, message: 'Generating final preview...', delay: 500 }
+    ];
 
-      onGenerate(request);
-    }, 2000); // 2 seconds for demo
+    let currentStep = 0;
+    const updateProgress = () => {
+      if (currentStep < progressSteps.length) {
+        const { step, message, delay } = progressSteps[currentStep];
+        setProgressStep(step);
+        setProgressMessage(message);
+        currentStep++;
+        setTimeout(updateProgress, delay);
+      } else {
+        // Complete the generation
+        setIsGeneratingPreview(false);
+        setProgressStep(0);
+        setProgressMessage('');
+        
+        const request: AutoCutRequest = {
+          clips: fileSelection.clips,
+          music: fileSelection.music,
+          target_seconds: fileSelection.clips.length > 20 ? 120 : 60,
+          quality_settings: qualitySettings,
+          story_style: selectedStoryStyle,
+          style_preset: selectedStylePreset,
+          use_ai_selection: useAISelection
+        };
+
+        onGenerate(request);
+      }
+    };
+
+    // Start progress updates
+    setTimeout(updateProgress, 100);
   };
 
   const formatTime = (seconds: number) => {
@@ -277,35 +369,98 @@ const StoryboardPreview: React.FC<StoryboardPreviewProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6">
-      <div className="bg-[#0d0d0d] border border-[#1a1a1a] rounded-2xl max-w-7xl w-full max-h-[90vh] overflow-hidden">
+    <div 
+      className={`fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6 transition-all duration-500 ease-in-out ${
+        isModalVisible ? 'opacity-100' : 'opacity-0'
+      }`}
+      onClick={(e) => {
+        // Close modal when clicking on backdrop
+        if (e.target === e.currentTarget) {
+          handleClose();
+        }
+      }}
+      onWheel={(e) => {
+        // Prevent scroll propagation to background
+        e.stopPropagation();
+      }}
+    >
+      <div 
+        className={`bg-[#0d0d0d] border border-[#1a1a1a] rounded-2xl w-[95vw] h-[90vh] max-w-7xl overflow-hidden transition-all duration-500 ease-in-out ${
+          isModalVisible ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
+        }`}
+        onClick={(e) => {
+          // Prevent modal from closing when clicking inside
+          e.stopPropagation();
+        }}
+      >
+        {/* Generating Preview Animation - Always visible when generating */}
+        {isGeneratingPreview && (
+          <div className="absolute inset-0 flex items-center justify-center p-6 z-10">
+            <div className="max-w-2xl mx-auto space-y-6 h-[calc(90vh-200px)] flex flex-col justify-center transition-all duration-500 ease-in-out">
+              <div className="text-center transition-all duration-500 ease-in-out">
+                <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[#007acc] mx-auto mb-6 transition-all duration-300"></div>
+                <h2 className="text-2xl font-bold text-white mb-4 transition-all duration-300">Generating Preview...</h2>
+                
+                {/* Progress Steps */}
+                <div className="space-y-3 mb-6 w-full max-w-sm mx-auto transition-all duration-500 ease-in-out">
+                  {[1, 2, 3, 4, 5, 6].map((step) => (
+                    <div key={step} className={`flex items-center justify-center space-x-3 transition-all duration-300 ease-in-out ${
+                      step <= progressStep ? 'text-white' : 'text-[#666666]'
+                    }`}>
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-300 ease-in-out ${
+                        step <= progressStep 
+                          ? 'bg-[#007acc] text-white' 
+                          : 'bg-[#333333] text-[#666666]'
+                      }`}>
+                        {step < progressStep ? '✓' : step}
+                      </div>
+                      <span className="text-sm font-medium transition-all duration-300 ease-in-out">
+                        {step === 1 && 'Analyzing video clips...'}
+                        {step === 2 && 'Detecting objects and scenes...'}
+                        {step === 3 && 'Analyzing emotional content...'}
+                        {step === 4 && 'Processing music and timing...'}
+                        {step === 5 && 'Creating story narrative...'}
+                        {step === 6 && 'Generating final preview...'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Modal Content with Fade Animation */}
         <div className={`transition-opacity duration-300 ${showModalContent ? 'opacity-100' : 'opacity-0'}`}>
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-[#1a1a1a]">
-          <div className="flex items-center">
-            <div className="w-20 h-20 rounded-xl flex items-center justify-center mr-4 overflow-hidden">
-              <img 
-                src="/cs01.png" 
-                alt="ClipSense Logo" 
-                className="w-full h-full object-cover rounded-lg"
-              />
-            </div>
-            <div>
+          <div className="relative p-6 border-b border-[#1a1a1a]">
+            {/* Close button - top right */}
+            <button 
+              onClick={handleClose} 
+              className="absolute top-4 right-4 p-3 rounded-xl border border-transparent hover:border-[#333333] hover:text-white text-[#888888] text-2xl font-bold"
+            >
+              ×
+            </button>
+            
+            {/* Centered header content */}
+            <div className="flex flex-col items-center text-center">
+              <div className="w-20 h-20 rounded-xl flex items-center justify-center overflow-hidden">
+                <img 
+                  src="/cs01.png" 
+                  alt="ClipSense Logo" 
+                  className="w-full h-full object-cover rounded-lg"
+                />
+              </div>
               <h2 className="text-2xl font-bold text-white">Storyboard Preview</h2>
               <p className="text-[#888888]">AI-powered clip selection and timeline</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-xl border border-transparent hover:border-[#333333] hover:text-white text-[#888888]">
-            ×
-          </button>
-          </div>
 
-          <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)] scrollable">
+          <div className="p-6 overflow-y-auto h-[calc(90vh-120px)] scrollable">
             {/* Ensure a single root inside scroll area to avoid adjacent JSX parse issues */}
             <div>
-            {/* AI Selection Options - Hide during generation */}
-            {!isGeneratingPreview && (
+            {/* AI Selection Options - Hide permanently after generation starts */}
+            {!hasStartedGeneration && (
           <div className="max-w-2xl mx-auto mb-8 space-y-6">
             <div className="text-center mb-6">
               <h3 className="text-xl font-semibold text-white mb-2">AI-Powered Content Selection</h3>
@@ -544,10 +699,6 @@ const StoryboardPreview: React.FC<StoryboardPreviewProps> = ({
                               <span className="text-[#888888] text-sm">Scene Type</span>
                               <span className="text-white text-sm font-medium">{clip.scene || 'Unknown'}</span>
                             </div>
-                            <div className="py-2">
-                              <span className="text-[#888888] text-sm block mb-1">Selection Reason</span>
-                              <span className="text-white text-xs leading-relaxed">{clip.reason || 'AI Analysis'}</span>
-                            </div>
                           </div>
                         </div>
 
@@ -563,59 +714,12 @@ const StoryboardPreview: React.FC<StoryboardPreviewProps> = ({
                           {clip.description && (
                             <div className="mb-6 p-6 bg-[#0f0f0f] border border-[#1a1a1a] rounded-lg">
                               <h5 className="text-white font-medium mb-3 text-lg">AI Analysis</h5>
-                              <p className="text-white text-base leading-relaxed mb-4">
+                              <p className="text-white text-base leading-relaxed">
                                 {clip.description}
                               </p>
-                              
-                              {/* AI Analysis Details */}
-                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                                <div>
-                                  <span className="text-[#888888] block">Emotional Tone</span>
-                                  <span className="text-white font-medium">{clip.tone || 'Unknown'}</span>
-                                </div>
-                                <div>
-                                  <span className="text-[#888888] block">Story Importance</span>
-                                  <span className="text-white font-medium">{Math.round((clip.importance || 0) * 100)}%</span>
-                                </div>
-                                <div>
-                                  <span className="text-[#888888] block">Scene Classification</span>
-                                  <span className="text-white font-medium">{clip.scene || 'Unknown'}</span>
-                                </div>
-                              </div>
                             </div>
                           )}
 
-                          {/* AI Analysis Details */}
-                          <div className="space-y-4">
-
-                            {/* Object Detection */}
-                            {clip.object_analysis && (
-                              <div className="bg-[#0f0f0f] border border-[#1a1a1a] rounded-lg p-6">
-                                <h5 className="text-white font-medium mb-4 text-lg">
-                                  Object Detection
-                                </h5>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                  {Object.entries(clip.object_analysis.objects_detected || {}).map(([object, count]) => (
-                                    <div key={object} className="flex items-center justify-between py-3 border-b border-[#1a1a1a]">
-                                      <span className="text-[#888888] text-sm capitalize">
-                                        {object.replace(/_/g, ' ')}
-                                      </span>
-                                      <span className="text-white font-medium text-lg">{count as number}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                                {clip.object_analysis.key_moments && (
-                                  <div className="mt-3 pt-3 border-t border-[#1a1a1a]">
-                                    <span className="text-[#888888] text-sm">Key Moments: </span>
-                                    <span className="text-white text-sm">
-                                      {clip.object_analysis.key_moments.map((moment: number) => `${moment.toFixed(1)}s`).join(', ')}
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-
-                          </div>
                         </div>
                       </div>
                     </div>
@@ -637,7 +741,7 @@ const StoryboardPreview: React.FC<StoryboardPreviewProps> = ({
 
               {/* Actions */}
               <div className="flex justify-center space-x-4 pt-6 border-t border-[#1a1a1a]">
-                <button onClick={onClose} className="btn-secondary px-8 py-3">Cancel</button>
+                <button onClick={handleClose} className="btn-secondary px-8 py-3">Cancel</button>
                 <button onClick={handleGenerate} className="btn-primary px-8 py-3">Generate Video</button>
               </div>
             </div>
@@ -646,16 +750,6 @@ const StoryboardPreview: React.FC<StoryboardPreviewProps> = ({
           </div>
         </div>
 
-        {/* Generating Preview Animation */}
-        {isGeneratingPreview && (
-          <div className="absolute inset-0 bg-[#0d0d0d] flex items-center justify-center">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[#007acc] mx-auto mb-4"></div>
-              <h2 className="text-2xl font-bold text-white mb-2">Generating Preview...</h2>
-              <p className="text-[#888888]">Creating your highlight video</p>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

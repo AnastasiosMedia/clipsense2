@@ -30,6 +30,7 @@ class WeddingObjectDetectionResult(BaseModel):
     key_moments: List[float]  # timestamps of important moments
     analysis_duration: float
     scene_classification: str  # 'ceremony', 'reception', 'party', 'preparation'
+    people_count: int = 0  # Number of people detected in the clip
 
 class WeddingObjectDetector:
     """Detects wedding-specific objects and moments in video clips"""
@@ -90,7 +91,7 @@ class WeddingObjectDetector:
             return WeddingObjectDetectionResult(
                 clip_path=video_path, duration=0.0, objects_detected={},
                 confidence_scores={}, key_moments=[], analysis_duration=0.0,
-                scene_classification='unknown'
+                scene_classification='unknown', people_count=0
             )
         
         print(f"INFO:wedding_object_detector:🎬 Analyzing wedding clip: {os.path.basename(video_path)}")
@@ -149,6 +150,9 @@ class WeddingObjectDetector:
         # Convert to regular dict for Pydantic
         objects_detected_dict = dict(objects_detected)
         
+        # Calculate people count (faces detected)
+        people_count = objects_detected_dict.get('faces', 0)
+        
         end_time = time.time()
         analysis_duration = end_time - start_time
         
@@ -161,7 +165,8 @@ class WeddingObjectDetector:
             confidence_scores=avg_confidence,
             key_moments=key_moments,
             analysis_duration=analysis_duration,
-            scene_classification=scene_classification
+            scene_classification=scene_classification,
+            people_count=people_count
         )
     
     async def _detect_objects_in_frame(self, frame: np.ndarray) -> Dict[str, int]:

@@ -25,7 +25,7 @@ export const Toast: React.FC<ToastProps> = ({
   }, [duration, onClose]);
 
   const getToastStyles = () => {
-    const baseStyles = "fixed top-4 right-4 z-50 max-w-sm w-full bg-[#0f0f0f] shadow-lg rounded-lg pointer-events-auto ring-1 ring-[#1a1a1a] overflow-hidden transform transition-all duration-300 ease-in-out";
+    const baseStyles = "fixed top-4 right-4 z-50 max-w-sm w-full bg-[#0f0f0f] shadow-lg rounded-lg pointer-events-auto ring-1 ring-[#1a1a1a] overflow-hidden transform transition-all duration-500 ease-in-out";
     
     if (!isVisible) {
       return `${baseStyles} translate-x-full opacity-0`;

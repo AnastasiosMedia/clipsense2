@@ -217,10 +217,10 @@ export const VideoPreviewModal: React.FC<VideoPreviewModalProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50"
+      className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 transition-all duration-500 ease-in-out"
       onClick={handleBackdropClick}
     >
-      <div className="relative w-full max-w-6xl mx-4">
+      <div className="relative w-full max-w-6xl mx-4 transition-all duration-500 ease-in-out">
 
                {/* Video Container */}
                <div 

@@ -136,17 +136,17 @@ export const FilePicker: React.FC<FilePickerProps> = ({
   }, [disabled, fileSelection, onFileSelectionChange]);
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 transition-all duration-500 ease-in-out">
       {/* Clips Selection */}
-      <div className="card">
-        <h3 className="text-lg font-semibold mb-3">Video Clips</h3>
+      <div className="card transition-all duration-500 ease-in-out">
+        <h3 className="text-lg font-semibold mb-3 transition-all duration-300">Video Clips</h3>
         
         {/* Drag and Drop Zone */}
         <div
           onDragOver={handleDragOverClips}
           onDragLeave={handleDragLeaveClips}
           onDrop={handleDropClips}
-          className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors duration-200 mb-3 ${
+          className={`border-2 border-dashed rounded-lg p-6 text-center transition-all duration-300 ease-in-out mb-3 ${
             dragOverClips
               ? 'border-[#007acc] bg-[#007acc]/10'
               : 'border-[#1a1a1a] hover:border-[#333333]'

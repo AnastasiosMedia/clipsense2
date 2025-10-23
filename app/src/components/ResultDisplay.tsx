@@ -26,29 +26,29 @@ export const ResultDisplay: React.FC<ResultDisplayProps> = ({
   };
 
   return (
-    <div className="card">
-      <h3 className="text-lg font-semibold mb-3 text-green-400">✅ Highlight Video Created!</h3>
+    <div className="card transition-all duration-500 ease-in-out">
+      <h3 className="text-lg font-semibold mb-3 text-green-400 transition-all duration-300">✅ Highlight Video Created!</h3>
       
-      <div className="space-y-3">
-        <div className="bg-green-900/20 border border-green-500/50 rounded-lg p-4">
-          <p className="text-sm text-green-300 mb-2">Output file:</p>
-          <p className="text-xs text-[#666666] font-mono break-all">
+      <div className="space-y-3 transition-all duration-500 ease-in-out">
+        <div className="bg-green-900/20 border border-green-500/50 rounded-lg p-4 transition-all duration-300 ease-in-out">
+          <p className="text-sm text-green-300 mb-2 transition-all duration-300">Output file:</p>
+          <p className="text-xs text-[#666666] font-mono break-all transition-all duration-300">
             {outputPath}
           </p>
         </div>
         
-        <div className="flex space-x-3">
+        <div className="flex space-x-3 transition-all duration-500 ease-in-out">
           {onOpenPreview && (
             <button
               onClick={onOpenPreview}
-              className="btn-yellow flex-1"
+              className="btn-yellow flex-1 transition-all duration-300 ease-in-out"
             >
               Open Preview
             </button>
           )}
           <button
             onClick={handleOpenFile}
-            className="btn-primary flex-1"
+            className="btn-primary flex-1 transition-all duration-300 ease-in-out"
           >
             Open File Location
           </button>
